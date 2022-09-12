@@ -1,0 +1,1 @@
+pyinstaller --noconsole --onefile "C:\Users\DL\Desktop\Mindustry Mod Construct\WindowTest.py"

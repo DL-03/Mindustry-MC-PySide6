@@ -1,0 +1,1215 @@
+﻿from json.decoder import JSONDecodeError
+from PIL import Image
+from PIL.ImageQt import ImageQt
+
+import os
+import sys
+import shutil
+
+from pathlib import Path
+
+import json
+from PyQt5 import QtGui
+import hjson
+
+from PyQt5 import QtWidgets
+from PyQt5.QtCore import QPoint, QRect, QDir, QAbstractTableModel, QTime, QTimer
+from PyQt5 import QtCore
+from PyQt5.QtWidgets import QApplication, QDialog, QDialogButtonBox, QDockWidget, QFocusFrame, QFrame, QLabel, QLayout, QLineEdit, QListWidget, QMainWindow, QMenu, QMenuBar, QPushButton, QStyle, QStyleOptionTitleBar, QTabWidget, QTreeView, QVBoxLayout, QWidget, QFileDialog, QMessageBox, QCheckBox, QScrollArea, QHBoxLayout, QGridLayout, QComboBox, QTextEdit, QToolBar, QGraphicsTextItem, QGraphicsItem, QFileSystemModel
+from PyQt5.QtGui import QCursor, QPainter, QColor, QFont, QPixmap, QFontDatabase, QTextLine
+from hjson.scanner import HjsonDecodeError
+
+
+window = None
+
+attachebleWidgets = []
+
+_tempButtonContent = None
+
+TempZipPath = ""
+ContentObject = {"Mod": {}, "Path": None, "Type": ["", ""], "Text": ""}
+RootMod = [{}, ""]
+
+StyleSheetList = ["QPushButton { font-family: fontello; font-size: 10 px; background-color:#000000; border-style: solid; border-width: 3px; border-color: #454545; color: #ffffff; } QPushButton:hover {border-color: #ffd37f;} QFrame { font-family: fontello; font-size: 10 px; background-color:#000000; border-style: solid; border-width: 3px; border-color: #454545; color: #ffffff; }", 
+				  "QPushButton { background-color:#00000000; border-style: solid; border-width: 3px; border-color: #454545; color: #ffffff; } QPushButton:hover { background-color:#00000000; border-style: solid; border-width: 3px; border-color: #ffd37f; color: #ffffff; }", 
+				  "QPushButton { background-color:#000000; border-style: solid; border-width: 1px; border-color: #454545; color: #ffffff; } QPushButton:hover { background-color:#000000; border-style: solid; border-width: 1px; border-color: #ffd37f; color: #ffffff; } QPushButton:disabled { background-color:#000000; border-style: solid; border-width: 1px; border-color: #84f490; color: #ffffff; }"]
+
+
+class MainWindow(QMainWindow):
+	def __init__(self):
+		super().__init__()
+		self.setBaseSize(800, 700)
+		self.setMinimumSize(800, 700)
+		self.setWindowTitle("Окна Окна и Еще раз Окна!")
+		self.setStyleSheet("background-color: #252525;")
+		self.setAcceptDrops(True)
+
+
+
+app = QApplication(sys.argv)
+
+window = MainWindow()
+
+id = QFontDatabase.addApplicationFont("font.ttf")
+families = QFontDatabase.applicationFontFamilies(id)
+
+buferMessage = []
+def SummonMessage(_text, _them = "message", _window = window):
+	_tempp = QLabel(_window)
+
+	_tempp.setText(str(_text))
+	_tempp.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+
+	if _them == "error":
+		_tempp.setStyleSheet("background-color: rgba(0, 0, 0, 135); border-color: #e55454; border-width: 2 px; border-style: solid ; color: #ffffff")
+	else:
+		_tempp.setStyleSheet("background-color: rgba(0, 0, 0, 135); border-color: #ffd37f; border-width: 2 px; border-style: solid ; color: #ffffff")
+	_tempp.setFont(QFont(families[0], 12))
+	_tempp.move(0, 0)
+
+	
+
+	_tempp.adjustSize()
+	_tempp.resize(_tempp.width() + 15, _tempp.height() + 15)
+	_tempp.show()
+
+	if _them == "info":
+		_tempp.move(0, (_tempp.height() * -1))
+
+	for i in buferMessage:
+		if _tempp.y() + _tempp.height() > i["widget"].y() and i["window"] == _window:
+			i["widget"].move(int(i["window"].width()/2 - i["widget"].width()/2), i["widget"].y() + _tempp.height())
+
+	buferMessage.append({"widget": _tempp, "them": _them, "window": _window})
+
+	#print("[SummonMessage]: " + str(_text))
+
+def MessageDeleteInfo(i):
+	#print(i)
+	buferMessage[i]["them_info"] = 2
+
+def MessageUpdate():
+	n = 0
+	#try:
+	if 1==1:
+		for i in buferMessage:
+				
+			if i["them"] == "info":
+				if "them_info" in i:
+					if i["them_info"] == 0:
+						if i["widget"].y() < 0:
+							i["widget"].move(int(i["window"].width()/2 - i["widget"].width()/2), i["widget"].y() + 1)
+							if i["widget"].y() >= 0:
+								i["them_info"] = 1
+								QTimer.singleShot(5000, lambda: MessageDeleteInfo(n-1))
+					elif i["them_info"] == 2:
+						i["widget"].move(int(i["window"].width()/2 - i["widget"].width()/2), i["widget"].y() - 1)
+						if i["widget"].y() < (i["widget"].height() * -1):
+							i["widget"].deleteLater()
+							buferMessage.remove(i)
+							break
+				else:
+					i.update({"them_info": 0})
+			else:
+				if i["widget"].y() > int(i["window"].height()/4) + (i["widget"].height() + 15 * 2):
+					i["widget"].deleteLater()
+					buferMessage.remove(i)
+					break
+				i["widget"].move(int(i["window"].width()/2 - i["widget"].width()/2), i["widget"].y() + 1)
+				#print(max(min(int(i.height()/39), 1), 0.1))
+			n += 1
+	#except Exception as x:
+		#print(x)
+
+window.q1Timer = QTimer()
+window.q1Timer.setInterval(10)
+window.q1Timer.timeout.connect(MessageUpdate)
+window.q1Timer.start()
+
+class DrawWindow(QFrame):
+	def TimerUpdate(self):
+		
+		if self.attachedWidget != None and 1 == 0:
+			if self.attachedWidget.parentWidget() != window:
+				self.move(self.attachedWidget.x() + self.attachedWidget.parentWidget().x(), self.attachedWidget.y() + self.attachedWidget.parentWidget().y())
+				self.resize(self.attachedWidget.width(), self.attachedWidget.height())
+			else:
+				self.move(self.attachedWidget.x(), self.attachedWidget.y())
+				self.resize(self.attachedWidget.width(), self.attachedWidget.height())
+
+			self.allUpdate()
+	
+	def mouseDoubleClickEvent(self, event):
+		self.attach()
+	def setBaseGeometry(self, _x, _y, _width, _height):
+		self.baseGeometry = QRect(_x, _y, _width, _height)
+	def __init__(self):
+		super().__init__(window, objectName="window")
+		self.move(300, 300)
+		self.resize(300, 300)
+		#self.setMinimumSize(300, 300)
+		
+		self.setBaseGeometry(300, 300, 300, 300)
+
+
+		#self.setWindowTitle("Test")
+		self.setStyleSheet("QFrame#window { background-color:#252525; border-style: solid; border-width: 3px; border-color: #454545; } color: #ffffff; QLabel { background-color: #00000000; border-width: 0px }")
+		self.setProperty("class", "window")
+		#self.setAcceptDrops(True)
+
+
+		self.attachedWidget = None
+
+		main = self
+
+		self.timerUpdate = QTimer()
+		self.timerUpdate.setInterval(100)
+		self.timerUpdate.timeout.connect(self.TimerUpdate)
+		self.timerUpdate.start()
+
+		class UpPanel(QFrame):
+
+			
+
+			def __init__(self):
+				super().__init__(window, objectName="window")
+				self.panelHeight = 25
+				self.move(main.x(), main.y() - self.panelHeight)
+				self.resize(main.width(), self.panelHeight)
+				self.setStyleSheet("QFrame#window { background-color:#000000; border-style: solid; border-width: 3px; border-color: #454545; }  ")
+				self.mi = False
+				self.mx = 0
+				self.my = 0
+
+				self.isAttached = False
+
+				self.title = QLabel(self)
+				self.title.move(5, 3)
+				self.title.resize(self.width() - 100, self.height() - 6)
+				self.title.setStyleSheet( "background-color:#000000; color: #ffffff; border-width: 0px; font-size: 10; font-family: fontello" )
+				self.title.setText("Тест")
+				
+				self.buttonClose = QPushButton(self)
+				self.buttonClose.move(self.width()-self.panelHeight, 0)
+				self.buttonClose.resize(self.panelHeight, self.panelHeight)
+				self.buttonClose.setStyleSheet(StyleSheetList[0])
+				self.buttonClose.clicked.connect(self.closeWindow)
+				self.buttonClose.setText("")
+				#self.buttonClose.hide()
+				
+				self.buttonHide = QPushButton(self)
+				self.buttonHide.move(self.width()-(self.panelHeight*2), 0)
+				self.buttonHide.resize(self.panelHeight, self.panelHeight)
+				self.buttonHide.setStyleSheet(StyleSheetList[0])
+				self.buttonHide.clicked.connect(self.hideWindow)
+				self.buttonHide.setText("") #
+
+				#self.openWindow()
+			
+				self.titleBarHeight = app.style().pixelMetric(
+					QStyle.PixelMetric.PM_TitleBarHeight,
+					QStyleOptionTitleBar(),
+					window
+				)
+
+			def setTitle(self, _text):
+				self.title.setText(_text)
+
+			def openWindow(self):
+
+
+				main.show()
+				self.show()
+
+				main.raise_()
+				self.raise_()
+
+			def closeWindow(self):
+				main.attach()
+
+				main.hide()
+				self.hide()
+
+			
+			
+			def hideWindow(self):
+				if main.isHidden():
+					main.show()
+					self.buttonHide.setText("") #
+				else:
+					main.hide()
+					self.buttonHide.setText("") #
+			def mouveButtons(self):
+				self.buttonClose.move(self.width()-(self.panelHeight*1), 0)
+				self.buttonHide.move(self.width()-(self.panelHeight*2), 0)
+
+			def mousePressEvent(self, event):
+				if self.mi == False:
+					self.mi = True
+					self.mx = self.x() - QtGui.QCursor.pos().x()
+					self.my = self.y() - QtGui.QCursor.pos().y()
+
+				main.raise_()
+				self.raise_()
+			def mouseReleaseEvent(self, event):
+				self.mi = False
+				main.move(int(QtGui.QCursor.pos().x() + self.mx), int(QtGui.QCursor.pos().y() + self.my + self.panelHeight))
+				self.move(int(QtGui.QCursor.pos().x() + self.mx), int(QtGui.QCursor.pos().y() + self.my))
+
+				
+
+				if main.attachedWidget == None:
+					for i in attachebleWidgets:
+						#if i.attachedWidget == None:
+						if QtGui.QCursor.pos().x() - window.x() > i.x() and QtGui.QCursor.pos().x() - window.x() < i.x() + i.width():
+							if QtGui.QCursor.pos().y() - window.y() - self.titleBarHeight > i.y() and QtGui.QCursor.pos().y() - window.y() - self.titleBarHeight < i.y() + i.height():
+								main.attach(i)
+				
+				main.allUpdate()
+								
+
+
+			def mouseMoveEvent(self, event):
+				if self.mi:
+					main.move(int(QtGui.QCursor.pos().x() + self.mx), int(QtGui.QCursor.pos().y() + self.my + self.panelHeight))
+					self.move(int(QtGui.QCursor.pos().x() + self.mx), int(QtGui.QCursor.pos().y() + self.my))
+
+					
+
+					if main.attachedWidget == None:
+						for i in attachebleWidgets:
+							i.visualFrame.hide()
+							i.setStyleSheet("border-style: solid; border-width: 3px; border-color: #454545; color: #ffffff")
+							#if i.attachedWidget == None:
+							if QtGui.QCursor.pos().x() - window.x() > i.x() and QtGui.QCursor.pos().x() - window.x() < i.x() + i.width():
+								if QtGui.QCursor.pos().y() - window.y() - self.titleBarHeight > i.y() and QtGui.QCursor.pos().y() - window.y() - self.titleBarHeight < i.y() + i.height():
+									i.setStyleSheet("border-style: dashed; border-width: 3px; border-color: #ffd37f; color: #ffffff")
+									i.visualFrame.show()
+
+		upPanel = UpPanel()
+		self.upPanel = upPanel
+
+		class FrameResizer_R(QFrame):
+			def __init__(self):
+				super().__init__(main)
+				self.move(main.width() - 3, 0)
+				self.resize(3, main.height())
+
+				self.setStyleSheet(" QFrame { background-color: #454545 } QFrame:hover { background-color: #ffd37f }")
+				self.mi = False
+
+
+
+			def update(self):
+				self.move(min(max(int(QtGui.QCursor.pos().x() - window.x() - main.x()), main.minimumWidth()), main.maximumWidth()) - 3, 0)
+				main.resize(self.x() + 3, main.height())
+
+				main.allUpdate()
+
+
+			def mousePressEvent(self, event):
+				if self.mi == False:
+					self.mi = True
+			def mouseReleaseEvent(self, event):
+				self.mi = False
+				self.mx = 0
+
+				self.update()
+				self.move(main.width() - 3, 0)
+			def mouseMoveEvent(self, event):
+				if self.mi:
+					self.update()
+					
+		class FrameResizer_D(QFrame):
+			def __init__(self):
+				super().__init__(main)
+				self.move(0, main.height() - 3)
+				self.resize(main.width(), 3)
+
+				self.setStyleSheet(" QFrame { background-color: #454545 } QFrame:hover { background-color: #ffd37f }")
+				self.mi = False
+
+			def update(self):
+				self.move(0, int(min(max(QtGui.QCursor.pos().y() - window.y() - main.y() - upPanel.panelHeight, main.minimumHeight()), main.maximumHeight())))
+				main.resize(main.width(), self.y() + 3)
+
+				main.allUpdate()
+
+			def mousePressEvent(self, event):
+				if self.mi == False:
+					self.mi = True
+			def mouseReleaseEvent(self, event):
+				self.mi = False
+
+				self.update()
+				self.move(0, main.height() - 3)
+			def mouseMoveEvent(self, event):
+				if self.mi:
+					self.update()
+					
+		class FrameResizer_L(QFrame):
+			def __init__(self):
+				super().__init__(main)
+				self.move(0, 0)
+				self.resize(3, main.height())
+
+				self.setStyleSheet(" QFrame { background-color: #454545 } QFrame:hover { background-color: #ffd37f }")
+				self.mi = False
+				self.mx = 0
+				self.mx2 = 0
+
+			def update(self):
+				self.move(0, 0)
+				if main.width() <= main.minimumWidth():
+					pass
+				else:
+					main.move(QtGui.QCursor.pos().x() - window.x(), main.y())
+
+				
+				
+				main.resize( self.mx - (QtGui.QCursor.pos().x() - window.x()) + self.mx2, main.height())
+				
+				main.allUpdate()
+
+				
+
+			def mousePressEvent(self, event):
+				if self.mi == False:
+					self.mi = True
+					self.mx = QtGui.QCursor.pos().x() - window.x()
+					self.mx2 = main.width()
+
+			def mouseReleaseEvent(self, event):
+				self.mi = False
+
+				self.update()
+				self.move(0, 0)
+			def mouseMoveEvent(self, event):
+				if self.mi:
+					self.update()
+
+					
+		
+					
+
+		self.R = FrameResizer_R()
+		self.L = FrameResizer_L()
+		self.D = FrameResizer_D()
+
+	def allUpdate(self):
+		if self.attachedWidget == None:
+			if self.y() <= self.upPanel.panelHeight:
+				self.move(self.x(), self.upPanel.panelHeight)
+
+		self.upPanel.move(self.x(), self.y() - self.upPanel.panelHeight)
+		self.upPanel.resize(self.width(), self.upPanel.panelHeight)
+		self.upPanel.mouveButtons()
+
+		self.R.move(self.width() - self.R.width(), 0)
+		self.R.resize(self.R.width(), self.height())
+		
+		self.L.move(0, 0)
+		self.L.resize(self.R.width(), self.height())
+		
+		self.D.move(0, self.height() - self.D.height())
+		self.D.resize(self.width(), self.D.height())
+
+	def attach(self, _widget = None):
+		#print(type(_widget))
+		#print(hasattr(_widget, 'x'))
+		self.upPanel.mx = 0
+
+		if _widget != None:
+			self.attach()
+
+			self.attachedWidget = _widget
+			#self.attachedWidget.itemAdd(self)
+			_widget.itemAdd(self)
+
+			_widget.visualFrame.hide()
+			_widget.setStyleSheet("border-style: solid; border-width: 3px; border-color: #454545; color: #ffffff")
+
+			#self.attachedWidget.setBaseGeometry(self.attachedWidget.geometry)
+			
+			#self.attachedWidget.resize(self.size())
+
+
+			self.show()
+
+			#print(self.attachedWidget)
+
+			self.upPanel.hide()
+
+			self.L.hide()
+			self.R.hide()
+			self.D.hide()
+
+		else:
+			#print(self.attachedWidget)
+			if self.attachedWidget != None:
+				self.attachedWidget.itemDel(self)
+				#self.attachedWidget.setGeometry(self.attachedWidget.baseGeometry())
+			
+			
+			
+
+			self.attachedWidget = None
+
+			
+
+			#self.setParent(window)
+			#upPanel.setParent(window)
+
+			self.upPanel.show()
+
+			self.L.show()
+			self.R.show()
+			self.D.show()
+
+		self.allUpdate()
+
+		
+
+		
+		
+		
+	def mousePressEvent(self, event):
+		self.raise_()
+		self.upPanel.raise_()
+		
+
+
+
+
+
+
+
+
+class AttachebleFrame(QFrame):
+	
+	def __init__(self, _x = 0, _y = 0, _width = 300, _height = 300, _varLocal = window):
+		super().__init__(window)
+
+		self.visualFrame = QFrame(window)
+		self.visualFrame.setStyleSheet("border-style: dashed; border-width: 3px; border-color: #ffd37f; color: #ffffff; background-color: #00000000")
+		self.visualFrame.move(self.x() - 3, self.y() - 3)
+		self.visualFrame.resize(self.width() + 6, self.height() + 6)
+
+		self.setStyleSheet("border-style: solid; border-width: 3px; border-color: #454545; color: #ffffff")
+		
+		self.valueFrameAdd = 0
+
+		self.attachedWidgets = []
+
+		self._varLocal = _varLocal
+		self._x = _x
+		self._y = _y
+		self._width = _width
+		self._height = _height
+
+
+		self.update()
+
+		self.titleBarHeight = app.style().pixelMetric(
+			QStyle.PixelMetric.PM_TitleBarHeight,
+			QStyleOptionTitleBar(),
+			window
+		)
+
+		#self.move(x, y)
+		#self.resize(_width, _height)
+
+		
+
+
+		#self.gridLayout = QVBoxLayout()
+
+
+
+
+		self.qTimer = QTimer()
+		self.qTimer.setInterval(100)
+		self.qTimer.timeout.connect(self.update)
+		self.qTimer.start()
+
+	def itemAdd(self, _widget):
+		
+		self.attachedWidgets.insert(self.valueFrameAdd, _widget)
+		#self.gridLayout.addWidget(_widget)
+		
+	def itemDel(self, _widget):
+		#print(_widget)
+		self.attachedWidgets.remove(_widget)
+		
+		#self.gridLayout.removeWidget(_widget)
+
+	def update(self):
+		x = self._x
+		y = self._y
+		width = self._width
+		height = self._height
+
+		if type(self._x) is list:
+			if len(self._x) > 1:
+				x = eval (str(self._varLocal.width()) + self._x[1] + str(self._x[0]))
+			else:
+				x = self._varLocal.width() + self._x[0]
+				
+		if type(self._y) is list:
+			if len(self._y) > 1:
+				y = eval (str(self._varLocal.height()) + self._y[1] + str(self._y[0]))
+			else:
+				y = self._varLocal.height() + self._y[0]
+				
+		if type(self._width) is list:
+			if len(self._y) > 1:
+				y = eval (str(self._varLocal.width()) + self._width[1] + str(self._width[0]))
+			else:
+				y = self._varLocal.width() + self._width[0]
+				
+		if type(self._height) is list:
+			if len(self._y) > 1:
+				y = eval (str(self._varLocal.height()) + self._height[1] + str(self._height[0]))
+			else:
+				y = self._varLocal.height() + self._height[0]
+
+		self.move(x, y)
+		self.resize(width, height)
+
+		
+
+		#self.visualFrame.show()
+		
+		#if int(len(self.attachedWidgets)/2)%2 == 0:
+		for t in range(int(len(self.attachedWidgets)/1)):
+			
+			#print(QCursor().pos().y() - window.y())
+			#self.visualFrame.move(self.x() - 3, self.y() - 3 + (self.attachedWidgets[t].y() - 10))
+			if t == 0:
+				if self.attachedWidgets[t].y() < QCursor().pos().y() - window.y() - self.titleBarHeight and self.attachedWidgets[t].y() + 20 > QCursor().pos().y() - window.y() - self.titleBarHeight:
+					self.visualFrame.move(self.x() - 3, (self.attachedWidgets[t].y()))
+					self.visualFrame.resize(self.width() + 6, 20)
+					self.visualFrame.raise_()
+					#self.visualFrame.show()
+					self.valueFrameAdd = 0
+					break
+			else:
+				if self.attachedWidgets[t].y() - 7 < QCursor().pos().y() - window.y() - self.titleBarHeight and self.attachedWidgets[t].y() + 13 > QCursor().pos().y() - window.y() - self.titleBarHeight:
+					self.visualFrame.move(self.x() - 3, (self.attachedWidgets[t].y() - 10))
+					self.visualFrame.resize(self.width() + 6, 20)
+					self.visualFrame.raise_()
+					#self.visualFrame.show()
+					self.valueFrameAdd = t
+					break
+			if t + 1 == len(self.attachedWidgets):
+				if self.y() + self.height() - 20 < QCursor().pos().y() - window.y() - self.titleBarHeight and self.y() + self.height() > QCursor().pos().y() - window.y() - self.titleBarHeight:
+					self.visualFrame.move(self.x() - 3, (self.y() + self.height() - 20))
+					self.visualFrame.resize(self.width() + 6, 20)
+					self.visualFrame.raise_()
+					#self.visualFrame.show()
+					self.valueFrameAdd = t + 1
+					break
+		else:
+			self.visualFrame.move(self.x() - 3, self.y() - 3)
+			self.visualFrame.resize(self.width() + 6, self.height() + 6)
+			self.valueFrameAdd = len(self.attachedWidgets)
+
+		#self.visualFrame.move(self.x() - 3, self.y() - 3)
+		#self.visualFrame.resize(self.width() + 6, self.height() + 6)
+		#try:
+		for i in range(len(self.attachedWidgets)):
+			if len(self.attachedWidgets) == 1:
+				iy = 0
+			else:
+				iy = int(self.height()/len(self.attachedWidgets)) * i 
+			self.attachedWidgets[i].move(self.x(), int(self.y() + iy))
+			self.attachedWidgets[i].resize(self.width(), int(self.height()/len(self.attachedWidgets)))
+
+		#except:
+			#print("haahah")
+
+
+num1 = AttachebleFrame(300, 5, 300, 600)
+attachebleWidgets.append(num1)
+
+#num2 = AttachebleFrame(500-10, 5, 300, 600)
+#attachebleWidgets.append(num2)
+
+drawTestWindow = DrawWindow()
+drawTestWindow.button1 = QPushButton(drawTestWindow)
+drawTestWindow.button1.setText("Привет!")
+drawTestWindow.button1.setStyleSheet(StyleSheetList[0])
+drawTestWindow.button1.move(100, 100)
+drawTestWindow.button1.resize(75, 25)
+drawTestWindow.button1.clicked.connect(lambda: SummonMessage("Идите пожалуйста *****!)))))"))
+
+class CardModInfo(DrawWindow):
+	def __init__(self):
+		super().__init__()
+		self.move(0, 30)
+		self.allUpdate()
+		self.resize(300, 75)
+		self.upPanel.closeWindow()
+		self.setStyleSheet("border-style: solid; border-width: 3px; border-color: #454545; background-color: #00000000")
+		#self.upPanel.openWindow()
+
+		self.Name = QLabel(self)
+		self.Name.setFont(QFont(families[0], 12))
+		self.Name.move(77, 10)
+		self.Name.resize(225, 20)
+		self.Name.setStyleSheet("color: #ffffff")
+			
+		self.Version = QLabel(self)
+		self.Version.setFont(QFont(families[0], 12))
+		self.Version.move(77, 28)
+		self.Version.resize(225, 20)
+		self.Version.setStyleSheet("color: #ffffff")
+			
+		self.Author = QLabel(self)
+		self.Author.setFont(QFont(families[0], 12))
+		self.Author.move(77, 45)
+		self.Author.resize(225, 20)
+		self.Author.setStyleSheet("color: #ffffff")
+
+	def setAllText(self, _name, _version, _author):
+		self.Name.setText(_name)
+		self.Version.setText(_version)
+		self.Author.setText(_author)
+
+ModContentFrame = CardModInfo()
+
+def CloseMod():
+	global TempZipPath, RootMod, ContentObject
+	TempZipPath = ""
+	RootMod = [{}, ""]
+	ContentObject = {"Mod": {}, "Path": None, "Type": ["", ""], "Text": ""}
+
+	ModCloseButton.hide()
+	ModChoseButton.show()
+
+
+	Logo = Image.open("noneMod.png")
+
+
+	ModContentFrame.setAllText("", "", "")
+
+	IconMod.setPixmap(QPixmap().fromImage(ImageQt(Logo).copy()))
+
+	tree.hide()
+
+	SummonMessage("Бан!")
+
+class _IconMod(QLabel):
+	def __init__(self):
+		super().__init__(ModContentFrame)
+		self.move(3, 3)
+		self.resize(75-6, 75-6)
+		self.setFont(QFont(families[0], 8))
+		self.setScaledContents(True)
+		self.setStyleSheet("border-style: solid; border-width: 3px; border-color: #ffd37f; color: #ffffff")
+		self.setAcceptDrops(True)
+
+ModOpenButton = QPushButton(ModContentFrame)
+ModOpenButton.move(0, 0)
+ModOpenButton.resize(300, 75)
+ModOpenButton.setStyleSheet(StyleSheetList[1])
+
+IconMod = _IconMod()
+	
+ModOpenButton.clicked.connect(lambda: SummonMessage("Не думаю Что-ты\nтут что-то найдеш)"))
+
+class GetOpenMode(DrawWindow):
+	def __init__(self):
+		super().__init__()
+		self.upPanel.setTitle("Открыть Мод Как?")
+		self.setMinimumSize(300, 75)
+		self.setMaximumSize(300, 75)
+		self.resize(300, 75)
+		self.upPanel.buttonClose.setDisabled(True)
+
+		self.layout = QGridLayout(self)
+
+		self._Label = QLabel("Каким способом открыть мод?")
+		self._Label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+		self._Label.setFont(QFont(families[0], 12))
+		self._Label.setStyleSheet("color: #ffffff")
+
+
+		self.button0 = QPushButton("Папка")
+		self.button0.setStyleSheet(StyleSheetList[0])
+		self.button0.setFont(QFont(families[0], 12))
+		self.button0.clicked.connect(lambda: OpenMod(0))
+
+		self.button1 = QPushButton("Архив")
+		self.button1.setStyleSheet(StyleSheetList[0])
+		self.button1.setFont(QFont(families[0], 12))
+		self.button1.clicked.connect(lambda: OpenMod(1))
+
+		self.layout.addWidget(self._Label, 0, 0, 1, 0)
+
+		self.layout.addWidget(self.button0, 1, 0)
+		self.layout.addWidget(self.button1, 1, 1)
+
+getOpenMode = GetOpenMode()
+
+ModCloseButton = QPushButton(ModContentFrame)
+ModCloseButton.setText("")
+ModCloseButton.setFont(QFont(families[0], 12))
+ModCloseButton.move(300 - (int(75/2) + 15) - 40, int(75/2) - 15)
+ModCloseButton.resize(30, 30)
+ModCloseButton.setStyleSheet(StyleSheetList[0])
+ModCloseButton.setToolTip("Закрыть Мод")
+ModCloseButton.clicked.connect(CloseMod)
+
+ModCloseButton.hide()
+	
+ModChoseButton = QPushButton(ModContentFrame)
+ModChoseButton.setText("")
+ModChoseButton.setFont(QFont(families[0], 12))
+ModChoseButton.move(300 - (int(75/2) + 15), int(75/2) - 15)
+ModChoseButton.resize(30, 30)
+ModChoseButton.setStyleSheet(StyleSheetList[0])
+ModChoseButton.setToolTip("Открыть Мод")
+ModChoseButton.clicked.connect(getOpenMode.upPanel.openWindow)
+
+class GetCreateFile(DrawWindow):
+	def __init__(self):
+		super().__init__()
+		self.upPanel.setTitle("Создать Файл")
+		#self.upPanel.closeWindow()
+
+
+		'''_GetCreateFile = QWidget()
+		_GetCreateFile.setStyleSheet("background-color: #252525")
+		_GetCreateFile.setWindowTitle("Создать Файл")
+		_GetCreateFile.resize(300, 300)'''
+
+		self.layout1 = QGridLayout(self)
+
+		self._Label1 = QLabel("Создать Файл Контента")
+		self._Label1.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+		#self._Label1.setFont(QFont(families[0], 12))
+		self._Label1.setStyleSheet("color: #ffffff; font-family: fontello;")
+
+		self._tempCheckBoxStyle = "QComboBox { background-color:#000000; border-style: solid; border-width: 3px; border-color: #454545; color: #ffffff; } QComboBox:hover { background-color:#454545; border-style: solid; border-width: 3px; border-color: #454545; color: #ffffff; } QComboBox QAbstractItemView { background-color:#000000; border-style: solid; border-width: 3 0 3 0 px; border-color: #454545; color: #ffffff; } QComboBox QAbstractItemView:hover { background-color:#000000; border-style: solid; border-width: 3 0 3 0 px; border-color: #ffd37f; color: #ffffff; }"
+
+		self._formatFileChoose0 = QLabel("Формат Файла: ")
+		self._formatFileChoose0.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+		#self._formatFileChoose0.setFont(QFont(families[0], 9))
+		self._formatFileChoose0.setStyleSheet("color: #ffffff; font-family: fontello;")
+		self._formatFileChoose0.setMaximumWidth(100)
+
+		self._formatFileChoose1 = QComboBox(window)
+		self._formatFileChoose1.addItem("json")
+		self._formatFileChoose1.addItem("hjson")
+		self._formatFileChoose1.setStyleSheet(self._tempCheckBoxStyle)
+		#self._formatFileChoose1.setFont(QFont(families[0], 12))
+	
+	
+
+		self._rootTypeChoose0 = QLabel("Главний Тип: ")
+		self._rootTypeChoose0.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+		#self._rootTypeChoose0.setFont(QFont(families[0], 9))
+		self._rootTypeChoose0.setStyleSheet("color: #ffffff; font-family: fontello;")
+		self._rootTypeChoose0.setMaximumWidth(100)
+	
+
+		self._rootTypeChoose1 = QComboBox(window)
+		'''for o in DefaultFileSave.keys():
+			if o != "mod":
+				self._rootTypeChoose1.addItem(o)'''
+		self._rootTypeChoose1.setStyleSheet(self._tempCheckBoxStyle)
+		#self._rootTypeChoose1.setFont(QFont(families[0], 12))
+	
+	
+	
+	
+		self._typeChoose0 = QLabel("Тип Обєкта: ")
+		self._typeChoose0.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+		#self._typeChoose0.setFont(QFont(families[0], 9))
+		self._typeChoose0.setStyleSheet("color: #ffffff; font-family: fontello;")
+		self._typeChoose0.setMaximumWidth(100)
+
+		self._typeChoose1 = QComboBox(window)
+		#_typeChoose1.addItem("None")
+		#_rootTypeChoose1.addItem("items")
+		#_rootTypeChoose1.addItem("liquids")
+		self._typeChoose1.setStyleSheet(self._tempCheckBoxStyle)
+		#self._typeChoose1.setFont(QFont(families[0], 12))
+	
+	
+	
+
+		self._nameFile0 = QLabel("Название Файла: ")
+		self._nameFile0.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+		#self._nameFile0.setFont(QFont(families[0], 9))
+		self._nameFile0.setStyleSheet("color: #ffffff; font-family: fontello;")
+		self._nameFile0.setMaximumWidth(100)
+	
+
+		self._nameFile1 = QLineEdit(window)
+		self._nameFile1.setText("content")
+		self._nameFile1.setStyleSheet("color: #ffffff; border-style: solid; border-width: 3 px; border-color: #00000000; border-bottom-color: #454545; font-family: fontello;")
+		#self._nameFile1.setFont(QFont(families[0], 12))
+
+
+		#self._rootTypeChoose1.currentTextChanged.connect(setForRootType)
+		#self._typeChoose1.currentTextChanged.connect(setForType)
+
+		self._createButton = QPushButton("Создать")
+		self._createButton.setStyleSheet(StyleSheetList[0])
+		#self._createButton.setFont(QFont(families[0], 12))
+		#self._createButton.clicked.connect(createContent)
+
+		self.layout1.addWidget(self._Label1, 0, 0, 1, 0)
+
+		self.layout1.addWidget(self._formatFileChoose0, 1, 0)	
+		self.layout1.addWidget(self._formatFileChoose1, 1, 1)
+	
+		self.layout1.addWidget(self._rootTypeChoose0, 2, 0)	
+		self.layout1.addWidget(self._rootTypeChoose1, 2, 1)
+	
+		self.layout1.addWidget(self._typeChoose0, 3, 0)	
+		self.layout1.addWidget(self._typeChoose1, 3, 1)
+	
+		self.layout1.addWidget(self._nameFile0, 4, 0)	
+		self.layout1.addWidget(self._nameFile1, 4, 1)
+
+		self.layout1.addWidget(self._createButton, 5, 0, 1, 0)
+		#layout1.addWidget(button11, 5, 1)
+
+	
+	
+
+getCreateFile = GetCreateFile()
+
+
+treeWidget = DrawWindow()
+treeWidget.upPanel.setTitle("Древо Контента")
+treeWidget.setMaximumWidth(300)
+
+layoutTreeWidget = QGridLayout(treeWidget)
+layoutTreeWidget.setSpacing(0)
+
+tree = QTreeView(window)
+tree.hide()
+model = QFileSystemModel()
+tree.setStyleSheet("color: #ffffff; border-style: solid; border-width: 3 px; border-color: #454545;")
+#tree.setGeometry(0, 75, 300, window.height() - (75 + 30))
+
+	
+
+def ChooseTypeContent(_button = None):
+	global _tempButtonContent, EditRoot
+	if _tempButtonContent == None:
+		_type = buttonTreeBlocks.text()
+		_button.setDisabled(True)
+	else:
+		_type = _button.text()
+		_button.setDisabled(True)
+		_tempButtonContent.setDisabled(False)
+	_tempButtonContent = _button
+
+	if os.path.exists(RootMod[1] + "/content/" + _type.lower() + "/"):
+		model.setRootPath(RootMod[1] + "/content/" + _type.lower() + "/")
+
+		tree.setModel(model)
+		tree.setRootIndex(model.index(RootMod[1] + "/content/" + _type.lower() + "/"))
+
+		tree.setColumnWidth(0, 1000)
+			
+		tree.show()
+	else:
+		tree.hide()
+
+
+
+
+buttonTreeBlocks = QPushButton(window)
+buttonTreeBlocks.setText("Blocks")
+buttonTreeBlocks.setFont(QFont(families[0], 9))
+buttonTreeBlocks.move(0, 75)
+buttonTreeBlocks.resize(75, 15)
+buttonTreeBlocks.setMaximumSize(75, 15)
+buttonTreeBlocks.setStyleSheet(StyleSheetList[2])
+buttonTreeBlocks.clicked.connect(lambda: ChooseTypeContent(buttonTreeBlocks))
+	
+buttonTreeItems = QPushButton(window)
+buttonTreeItems.setText("Items")
+buttonTreeItems.setFont(QFont(families[0], 9))
+buttonTreeItems.move(0, 90)
+buttonTreeItems.resize(75, 15)
+buttonTreeItems.setMaximumSize(75, 15)
+buttonTreeItems.setStyleSheet(StyleSheetList[2])
+buttonTreeItems.clicked.connect(lambda: ChooseTypeContent(buttonTreeItems))
+	
+buttonTreeLiquids = QPushButton(window)
+buttonTreeLiquids.setText("Liquids")
+buttonTreeLiquids.setFont(QFont(families[0], 9))
+buttonTreeLiquids.move(75, 75)
+buttonTreeLiquids.resize(75, 15)
+buttonTreeLiquids.setMaximumSize(75, 15)
+buttonTreeLiquids.setStyleSheet(StyleSheetList[2])
+buttonTreeLiquids.clicked.connect(lambda: ChooseTypeContent(buttonTreeLiquids))
+	
+buttonTreeSectors = QPushButton(window)
+buttonTreeSectors.setText("Sectors")
+buttonTreeSectors.setFont(QFont(families[0], 9))
+buttonTreeSectors.move(75, 90)
+buttonTreeSectors.resize(75, 15)
+buttonTreeSectors.setMaximumSize(75, 15)
+buttonTreeSectors.setStyleSheet(StyleSheetList[2])
+buttonTreeSectors.clicked.connect(lambda: ChooseTypeContent(buttonTreeSectors))
+	
+buttonTreeStatus = QPushButton(window)
+buttonTreeStatus.setText("Status")
+buttonTreeStatus.setFont(QFont(families[0], 9))
+buttonTreeStatus.move(150, 75)
+buttonTreeStatus.resize(75, 15)
+buttonTreeStatus.setMaximumSize(75, 15)
+buttonTreeStatus.setStyleSheet(StyleSheetList[2])
+buttonTreeStatus.clicked.connect(lambda: ChooseTypeContent(buttonTreeStatus))
+	
+buttonTreeUnits = QPushButton(window)
+buttonTreeUnits.setText("Units")
+buttonTreeUnits.setFont(QFont(families[0], 9))
+buttonTreeUnits.move(150, 90)
+buttonTreeUnits.resize(75, 15)
+buttonTreeUnits.setMaximumSize(75, 15)
+buttonTreeUnits.setStyleSheet(StyleSheetList[2])
+buttonTreeUnits.clicked.connect(lambda: ChooseTypeContent(buttonTreeUnits))
+	
+buttonTreeWeathers = QPushButton(window)
+buttonTreeWeathers.setText("Weathers")
+buttonTreeWeathers.setFont(QFont(families[0], 9))
+buttonTreeWeathers.move(225, 75)
+buttonTreeWeathers.resize(75, 30)
+buttonTreeWeathers.setMaximumSize(75, 30)
+buttonTreeWeathers.setMinimumSize(75, 30)
+buttonTreeWeathers.setStyleSheet(StyleSheetList[2])
+buttonTreeWeathers.clicked.connect(lambda: ChooseTypeContent(buttonTreeWeathers))
+
+	
+layoutTreeWidget.addWidget(buttonTreeBlocks, 0, 0)
+layoutTreeWidget.addWidget(buttonTreeItems, 1, 0)
+layoutTreeWidget.addWidget(buttonTreeLiquids, 0, 1)
+layoutTreeWidget.addWidget(buttonTreeSectors, 1, 1)
+layoutTreeWidget.addWidget(buttonTreeStatus, 0, 2)
+layoutTreeWidget.addWidget(buttonTreeUnits, 1, 2)
+layoutTreeWidget.addWidget(buttonTreeWeathers, 0, 3, 2, 1)
+
+layoutTreeWidget.addWidget(tree, 2, 0, 3, 0)
+
+
+def OpenMod(_mode = 0):
+		global RootMod, TempZipPath
+
+		TempZipPath = ""
+
+
+		getOpenMode.upPanel.closeWindow()
+
+		ModCloseButton.hide()
+		ModChoseButton.show()
+			
+		try:
+
+			sucsFold = False
+			while sucsFold == False:
+				if _mode == 0:
+					Mod1 = QFileDialog.getExistingDirectory(window, "Выберете папку с модом", os.path.expanduser('~') + "\\AppData\\Roaming\\Mindustry\\mods\\")
+
+				else:
+					try:
+						shutil.rmtree("ZipTemp")
+					except Exception:
+						pass
+					os.mkdir("ZipTemp")
+					Mod1 = QFileDialog.getOpenFileName(window, "Выберете Архив с модом", os.path.expanduser('~') + "\\AppData\\Roaming\\Mindustry\\mods\\", "*.zip")
+	
+					TempZipPath = Mod1[0]
+				
+					
+					ModChoseButton.hide()
+					
+				
+					shutil.unpack_archive(Mod1[0], "ZipTemp", "zip")
+
+					Mod1 = "ZipTemp"
+					#print(Mod1)
+				ModCloseButton.show()
+
+				Mod = os.listdir(Mod1)
+				#print(Mod)
+				for i in Mod:
+					if i == "mod.json" or i == "mod.hjson":
+						sucsFold = True
+						RootMod[0] = openFiler(Mod1 + "/" + i)[0]
+						break
+				if sucsFold == False and len(Mod) == 1:
+					Mod1 = Mod1 + "/" + Mod[0]
+					Mod = os.listdir(Mod1)
+					for i in Mod:
+						if i == "mod.json" or i == "mod.hjson":
+							sucsFold = True
+							RootMod[0] = openFiler(Mod1 + "/" + i)[0]
+							break
+				#print(RootMod[0])
+				RootMod[1] = Mod1
+				if sucsFold == False:
+					msgBox = QMessageBox(window)
+					msgBox.setFont(QFont(families[0], 12))
+					msgBox.setStyleSheet(StyleSheetList[0] + "QMessageBox QLabel {color: #ffffff;}")
+					msgBox.setText("Мод не обнаружен!\nПопробуйте еще раз!")
+					msgBox.exec_()
+			#RootMod[1] = Mod1
+			
+			InitializationMod()
+		except Exception as x:
+			SummonMessage(x, "error")
+			CloseMod()
+
+tree.doubleClicked.connect(lambda: SummonMessage("Я не понимаю что-ты\nхочеш от меня?\nНезнаю на что ты расщитивал"))
+
+def getSuffixPath(_path):
+	return Path(_path).suffixes[0][1:]
+
+def openFiler(pathF):
+	try:
+		_text = None
+		with open(pathF, 'r') as f:
+			_text = f.read()
+
+		_tempCon = ""
+
+		for o in _text:
+			if o == "'":
+				_tempCon += '"'
+			else:
+				_tempCon += o
+			
+			
+
+		data = None
+
+		if getSuffixPath(pathF) == "json":
+			#data = json.loads(_tempCon)
+			#print("json")
+			try:
+				data = json.loads(_tempCon)
+			except Exception:
+				try:
+					data = hjson.loads(_tempCon)
+				except Exception:
+					try:
+						data = json.loads(_text)
+					except Exception:
+						data = hjson.loads(_text)
+		if getSuffixPath(pathF) == "hjson":
+			#data = hjson.loads(_tempCon)
+			try:
+				data = hjson.loads(_tempCon)
+			except Exception:
+				try:
+					data = hjson.loads(_text)
+				except Exception:
+					pass
+					#try:
+					#	data = json.load(f)
+					#except JSONDecodeError:
+					#	data = json.loads(_tempCon)
+		if data == {}:
+			try:
+				data = json.loads(_tempCon)
+			except Exception:
+				data = hjson.loads(_tempCon)
+		
+		opsa = [data, _text]
+			
+	except JSONDecodeError:
+		opsa = [None, _text]
+		SummonMessage("Json Файл не получаетса Открыть", "error")
+	except HjsonDecodeError:
+		opsa = [None, _text]
+		SummonMessage("Hjson Файл не получаетса Открыть", "error")
+	except Exception as x:
+		opsa = [None, _text]
+		SummonMessage(x, "error")
+	#print(opsa)
+	return opsa
+
+def coloritaText(text):
+	i = 0
+	i2 = 0
+	i3 = 0
+	itext = ""
+
+	#ModVer.setText('<font color="blue">' + str(RootMod[0]["version"]) + '</font>')
+
+	for it in text:
+		if it != "[" and it != "]":
+			itext += it
+		if it == "[" and i == 0:
+			i += 1
+			itext += '<font color="'
+		if it == "]" and i == 1:
+			itext += '">'
+			i -= 1
+	#print(itext)
+	return itext
+
+def InitializationMod():
+		global RootMod, ContentL, ContentL1, SpriteL, ContentObject
+		
+	#print(RootMod[1])
+	#print(RootMod[0])
+		
+	#try:
+		if RootMod[0] == None:
+			msgBox = QMessageBox(window)
+			#msgBox.setIcon(QMessageBox.warning)
+			msgBox.setText("Файл с информациєй о моде не возможно открить или же он бил поврежден!\nВозможни проблеми: Кодировка файла или же руские символи!\nФайл бил востоновлен!")
+			SummonMessage("Файл НЕ Востоновлен!")
+			msgBox.setFont(QFont(families[0], 12))
+			msgBox.setStyleSheet(StyleSheetList[0] + "QMessageBox QLabel {color: #ffffff;}")
+			msgBox.exec_()
+
+		try:
+			if os.path.exists(RootMod[1] + "/icon.png"):
+				IconMod.setPixmap(QPixmap(RootMod[1] + "/icon.png"))
+			else:
+				IconMod.setPixmap(QPixmap("noneMod.png"))
+		except Exception:
+			IconMod.setPixmap(QPixmap("noneMod.png"))
+
+
+		_ttt = ["name", "version", "author"]
+		for p in range(len(_ttt)):
+			try:
+				if "displayName" in RootMod[0] and _ttt[p] == "name":
+					_ttt[p] = coloritaText(str(RootMod[0]["displayName"]))
+				else:
+					_ttt[p] = coloritaText(str(RootMod[0][_ttt[p]]))
+			except:
+				_ttt[p] = coloritaText("[red]None")
+
+		ModContentFrame.setAllText(_ttt[0], _ttt[1], _ttt[2])
+
+		
+
+		tree.hide()
+		
+		treeWidget.upPanel.openWindow()
+
+		ModContentFrame.upPanel.openWindow()
+
+
+		SummonMessage("Мод был Открыт!\nНо как???")
+	#except Exception:
+		#SummonMessage("Мод был Открыт С Ошыбками!")
+
+
+window.show()
+window.setBaseSize(800, 700)
+
+app.exec_()
