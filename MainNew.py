@@ -18,7 +18,7 @@ import hjson
 from PyQt6.QtCore import QPoint, QRect, QDir, QAbstractTableModel, QSize, QTime, QTimer, Qt
 from PyQt6 import QtCore
 from PyQt6.QtWidgets import QApplication, QDialog, QDialogButtonBox, QDockWidget, QFocusFrame, QFrame, QLabel, QLayout, QLineEdit, QListWidget, QMainWindow, QMenu, QMenuBar, QPushButton, QScrollBar, QStyle, QStyleOptionTitleBar, QTabWidget, QTreeView, QVBoxLayout, QWidget, QFileDialog, QMessageBox, QCheckBox, QScrollArea, QHBoxLayout, QGridLayout, QComboBox, QTextEdit, QToolBar, QGraphicsTextItem, QGraphicsItem
-from PyQt6.QtGui import QPainter, QColor, QFont, QPixmap, QFileSystemModel, QFontDatabase, QTextLine, QAction
+from PyQt6.QtGui import QPainter, QColor, QFont, QPixmap, QFileSystemModel, QFontDatabase, QTextLine, QAction, QColor
 from hjson.scanner import HjsonDecodeError
 
 

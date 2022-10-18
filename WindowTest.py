@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import QApplication, QFrame, QLabel, QLayout, QLineEdit, QM
 from PyQt6.QtGui import QCursor, QFont, QPixmap, QFileSystemModel, QFontDatabase, QPainter, QColor
 from hjson.scanner import HjsonDecodeError
 
-from DrawWindow import DrawWindow
+from DrawWindow import DrawWindow, FrameResizer
 from MessagePanel import SummonMessage
 
 windowMoved = None
@@ -279,48 +279,39 @@ class AttachebleFrame(QFrame):
 			window
 		)
 
-		#self.move(x, y)
-		#self.resize(_width, _height)
-
-		
-
-
-		#self.gridLayout = QVBoxLayout()
-
-
-
 
 		self.qTimer = QTimer()
 		self.qTimer.setInterval(100)
 		self.qTimer.timeout.connect(self.update)
 		self.qTimer.start()
 
-		#print([1, 2, 3, 4, 5, 6][:-2])
 
 	def itemAdd(self, _widget):
 		print(self.valueFrameAdd)
 		print(self.attachedWidgets)
 		if len(self.valueFrameAdd) == 2:
-			#if self.valueFrameAdd[1][0] == "add":
-				'''if self.valueFrameAdd[1][1] == 0:
-					_t = [_widget, ListManager(self.attachedWidgets, self.valueFrameAdd[1])]
-				else:
-					_t = [ListManager(self.attachedWidgets, self.valueFrameAdd[1]), _widget]
-				print("[_t]:" + str(_t))
-				self.attachedWidgets = ListManager(self.attachedWidgets, self.valueFrameAdd[1], "replace", _t, self.valueFrameAdd[0])
-				'''
-				if type(list) != self.attachedWidgets[self.valueFrameAdd[0]]:
-					self.attachedWidgets[self.valueFrameAdd[0]]	= [self.attachedWidgets[self.valueFrameAdd[0]]]
-				self.attachedWidgets[self.valueFrameAdd[0]].insert(self.valueFrameAdd[1], _widget)
+			if type(list) != self.attachedWidgets[self.valueFrameAdd[0]]:
+				self.attachedWidgets[self.valueFrameAdd[0]]	= [self.attachedWidgets[self.valueFrameAdd[0]]]
+			self.attachedWidgets[self.valueFrameAdd[0]].insert(self.valueFrameAdd[1], _widget)
 		else:
 			self.attachedWidgets.insert(self.valueFrameAdd[0], _widget)
 
+			if len(self.attachedWidgets) == 1:
+				pass
+			else:
+				ooo = self.SideBar()
+				self.attachedWidgets.insert(self.valueFrameAdd[0], ooo)
+			print(self.attachedWidgets)
 		self.layoutUpdate()
-		#self.gridLayout.addWidget(_widget)
-		
-	def itemDel(self, _widget):
-		#print(_widget)
+	class SideBar(FrameResizer):
+		def __init__(self):
+			super().__init__(window, [0, 0], [100, 100])
+			self.show()
+		def mouseMoveEvent(self, a):
+			super().mouseMoveEvent(a)
+			
 
+	def itemDel(self, _widget):
 		for i in range(len(self.attachedWidgets)):
 			if type(self.attachedWidgets[i]) is list:
 				for io in range(len(self.attachedWidgets[i])):
@@ -330,15 +321,12 @@ class AttachebleFrame(QFrame):
 							self.attachedWidgets.pop(i)
 						elif len(self.attachedWidgets[i]) == 1:
 							self.attachedWidgets[i] = self.attachedWidgets[i][0]
-
 						break
 			else:
 				if self.attachedWidgets[i] == _widget:
 					self.attachedWidgets.remove(_widget)
 					break
 		self.layoutUpdate()
-		
-		#self.gridLayout.removeWidget(_widget)
 	def FrameDraw(self, _layout, _type = "y", posX = 0, posY = 0, sizeX = None, sizeY = None):
 		if sizeX == None:
 			sizeX = self.width()
@@ -354,26 +342,31 @@ class AttachebleFrame(QFrame):
 		for i in _layout:
 			if type(i) != list:
 				if _type == "y":
-					i.move(posX, posY + _t)
-					i.resize(sizeX, i.height())
+					if num%2==0:
+						i.move(posX, posY + _t)
+						i.resize(sizeX, i.height())
 
-					if i.y() + i.height() > posY + sizeY:
-						if (posY + sizeY) - i.y() >= i.minimumHeight():
-							i.resize(sizeX, (posY + sizeY) - i.y())
-						else:
-							_num = 0
-							for _i in reversed(_last):
-								if _i.height() - ((i.y() + i.height()) - (posY + sizeY)) >= _i.minimumHeight():
-									_i.resize(sizeX, _i.height() - ((i.y() + i.height()) - (posY + sizeY)))
-									_t -= (i.y() + i.height()) - (posY + sizeY)
-									i.move(posX, posY + _t)
-									for top in _last[:len(_last) - _num]:
-										if type(top) != list:
-											top.move(posX, top.y() - ((i.y() + i.height()) - (posY + sizeY)))
-									break
-								_num += 1
-					_t += i.height()
-					_last.append(i)
+						if i.y() + i.height() > posY + sizeY:
+							if (posY + sizeY) - i.y() >= i.minimumHeight():
+								i.resize(sizeX, (posY + sizeY) - i.y())
+							else:
+								_num = 0
+								for _i in reversed(_last):
+									if _i.height() - ((i.y() + i.height()) - (posY + sizeY)) >= _i.minimumHeight():
+										_i.resize(sizeX, _i.height() - ((i.y() + i.height()) - (posY + sizeY)))
+										_t -= (i.y() + i.height()) - (posY + sizeY)
+										i.move(posX, posY + _t)
+										for top in _last[:len(_last) - _num]:
+											if type(top) != list:
+												top.move(posX, top.y() - ((i.y() + i.height()) - (posY + sizeY)))
+										break
+									_num += 1
+						_t += i.height()
+						_last.append(i)
+					else:
+						i.resize(sizeX, 3)
+						i.CenterPod(posX, posY+_t)
+						i.raise_()
 				elif _type == "x":
 					i.move(posX + _t, posY)
 					i.resize(i.width(), sizeY)
@@ -389,144 +382,9 @@ class AttachebleFrame(QFrame):
 
 	def layoutUpdate(self):
 		self.update()
-		#self.visualFrame.show()
-
-		
-		#if int(len(self.attachedWidgets)/2)%2 == 0:
-		
-			
-		#self.visualFrame.move(self.x() - 3, self.y() - 3)
-		#self.visualFrame.resize(self.width() + 6, self.height() + 6)
-		#try:
-		'''for i in range(len(self.attachedWidgets)):
-			if len(self.attachedWidgets) == 1:
-				iy = 0
-			else:
-				iy = int(self.height()/len(self.attachedWidgets)) * i 
-			self.attachedWidgets[i].move(self.x(), int(self.y() + iy))
-			self.attachedWidgets[i].resize(self.width(), int(self.height()/len(self.attachedWidgets)))'''
-		
-
-		"""def _Temp2(_list = [], _id = 1, _listId = []):
-			ni = 0
-			_tn = 0
-
-			for i in _list:
-				print(i)
-				if type(i) is list:
-					_Temp2(i, _id + 1, _listId + [ni])
-					break
-				else:
-					_codeN = 0
-					if _id % 2 == 0:
-						pass
-					else:
-						i.move(self.x(), self.y() + _tn)
-						i.resize(self.width(), i.height())
-						if i.y() + i.height() > self.y() + self.height():
-							if i.minimumHeight() < i.height() - ((i.y() + i.height()) - (self.y() + self.height())):
-								i.resize(self.width(), i.height() - ((i.y() + i.height()) - (self.y() + self.height())))
-							else:
-								for t in range(len(_list)):
-									if type(_list[::-1][t]) is list:
-										pass
-									else:
-										if _list[::-1][t].minimumHeight() < _list[::-1][t].height() - ((i.y() + i.height()) - (self.y() + self.height())):
-											_list[::-1][t].resize(self.width(), _list[::-1][t].height() - ((i.y() + i.height()) - (self.y() + self.height())))
-											i.move(self.x(), self.y() + (_tn - ((i.y() + i.height()) - (self.y() + self.height()))))
-											break
-						'''if self.attachedWidgets[i-1].height() <= self.attachedWidgets[i-1].upPanel.titleBarHeight:
-							self.attachedWidgets[i-1].attach()
-							self.layoutUpdate()
-
-						if self.attachedWidgets[i].height() <= self.attachedWidgets[i].upPanel.titleBarHeight:
-							self.attachedWidgets[i].attach()
-							self.layoutUpdate()'''
-
-
-						'''if codeN == 1:
-							self.layoutUpdate()
-							break'''
-						#i.allUpdate()
-						_tn += i.height()
-		print(str(self.attachedWidgets) + "[][][]")
-		_Temp2(self.attachedWidgets)"""
-					
 		_ty = 0
 		_tx = 0
-
 		self.FrameDraw(self.attachedWidgets)
-
-		#self.valueFrameAdd = len(self.attachedWidgets)
-
-		codeY = 0
-		"""
-		try:
-			for i in range(len(self.attachedWidgets)):
-				if type(self.attachedWidgets[i]) is list:
-					for ix in range(len(self.attachedWidgets)):
-						self.attachedWidgets[i][ix].move(self.x() + _tx, self.y() + _ty)
-						self.attachedWidgets[i][ix].resize(self.attachedWidgets[i][ix].width(), self.attachedWidgets[i][0].height())
-						if self.attachedWidgets[i][ix].x() + self.attachedWidgets[i][ix].width() > self.x() + self.width():
-							#for t in range(len(self.attachedWidgets)):
-							if self.attachedWidgets[i][ix].minimumWidth() < self.attachedWidgets[i][ix].width() - ((self.attachedWidgets[i][ix].x() + self.attachedWidgets[i][ix].width()) - (self.x() + self.width())):
-								self.attachedWidgets[i][ix].resize(self.width(), self.attachedWidgets[i][ix].width() - ((self.attachedWidgets[i][ix].x() + self.attachedWidgets[i][ix].width()) - (self.x() + self.width())))
-							else:
-								for t in range(len(self.attachedWidgets[i])):
-									if self.attachedWidgets[i][::-1][t].minimumWidth() < self.attachedWidgets[i][::-1][t].width() - ((self.attachedWidgets[i][ix].x() + self.attachedWidgets[i][ix].width()) - (self.x() + self.width())):
-										self.attachedWidgets[i][::-1][t].resize(self.width(), self.attachedWidgets[i][::-1][t].width() - ((self.attachedWidgets[i][ix].x() + self.attachedWidgets[i][ix].width()) - (self.x() + self.width())))
-										self.attachedWidgets[i][ix].move(self.x() + (_tx - ((self.attachedWidgets[i][ix].x() + self.attachedWidgets[i][ix].width()) - (self.x() + self.width()))), _ty)
-										break
-
-						_tx += self.attachedWidgets[i][ix].width()
-				else:
-					self.attachedWidgets[i].move(self.x(), self.y() + _ty)
-					self.attachedWidgets[i].resize(self.width(), self.attachedWidgets[i].height())
-					if self.attachedWidgets[i].y() + self.attachedWidgets[i].height() > self.y() + self.height():
-						#for t in range(len(self.attachedWidgets)):
-						if self.attachedWidgets[i].minimumHeight() < self.attachedWidgets[i].height() - ((self.attachedWidgets[i].y() + self.attachedWidgets[i].height()) - (self.y() + self.height())):
-							self.attachedWidgets[i].resize(self.width(), self.attachedWidgets[i].height() - ((self.attachedWidgets[i].y() + self.attachedWidgets[i].height()) - (self.y() + self.height())))
-						else:
-							for t in range(len(self.attachedWidgets)):
-								if self.attachedWidgets[::-1][t].minimumHeight() < self.attachedWidgets[::-1][t].height() - ((self.attachedWidgets[i].y() + self.attachedWidgets[i].height()) - (self.y() + self.height())):
-									self.attachedWidgets[::-1][t].resize(self.width(), self.attachedWidgets[::-1][t].height() - ((self.attachedWidgets[i].y() + self.attachedWidgets[i].height()) - (self.y() + self.height())))
-									self.attachedWidgets[i].move(self.x(), self.y() + (_ty - ((self.attachedWidgets[i].y() + self.attachedWidgets[i].height()) - (self.y() + self.height()))))
-									break
-
-								#if t != i:
-								#	self.attachedWidgets[i].move(self.x(), self.y() + (_ty - ((self.attachedWidgets[i].y() + self.attachedWidgets[i].height()) - (self.y() + self.height()))))
-								#break
-							#if t >= len(self.attachedWidgets):
-								#break
-
-						#if self.attachedWidgets[i].y() + self.attachedWidgets[i].height() > self.y() + self.height()
-						#self.attachedWidgets[i].resize(self.width(), self.attachedWidgets[i].height() - ((self.attachedWidgets[i].y() + self.attachedWidgets[i].height()) - (self.y() + self.height())))
-						#if self.attachedWidgets[i].y() + self.attachedWidgets[i].height() > self.y() + self.height():
-						#	self.attachedWidgets[i-1].resize(self.width(), self.attachedWidgets[i-1].height() - ((self.attachedWidgets[i].y() + self.attachedWidgets[i].height()) - (self.y() + self.height())))
-						#	self.attachedWidgets[i].move(self.x(), self.y() + (_ty - ((self.attachedWidgets[i].y() + self.attachedWidgets[i].height()) - (self.y() + self.height()))))
-						#self.attachedWidgets[i].allUpdate()
-					try:
-						if self.attachedWidgets[i-1].height() <= self.attachedWidgets[i-1].upPanel.titleBarHeight:
-							self.attachedWidgets[i-1].attach()
-							self.layoutUpdate()
-							break
-						if self.attachedWidgets[i].height() <= self.attachedWidgets[i].upPanel.titleBarHeight:
-							self.attachedWidgets[i].attach()
-							self.layoutUpdate()
-							break
-
-						self.attachedWidgets[i].allUpdate()
-					except:
-						pass
-
-					_ty += self.attachedWidgets[i].height()
-
-				#self.attachedWidgets[i].resize(self.width(), int(self.height()/len(self.attachedWidgets)))
-
-		except:
-			print("haahah")
-		"""
-
 	def update(self):
 		x = self._x
 		y = self._y
@@ -572,175 +430,52 @@ class AttachebleFrame(QFrame):
 		self.visualFrame.move(self.x() - 3, self.y() - 3)
 		self.visualFrame.resize(self.width() + 6, self.height() + 6)
 		self.valueFrameAdd = [len(self.attachedWidgets)]
-		#_tempList = []
-		"""
-		def _Temp(_list = [], _id = 1, _listId = []):
-			ni = 0
-			for t in _list:
-				if type(t) is list:
-					_Temp(t, _id + 1, _listId + [ni])
+
+		for t in range(int(len(self.attachedWidgets))):
+			if t%2==0:
+				if type(self.attachedWidgets[t]) is list:
+					pass
 				else:
-					_obj = {"id": ni, "mouse": [QCursor().pos().x(), QCursor().pos().y()], "window": [window.x(), window.y() + self.titleBarHeight], "widget": [t.x(), t.y()], "widgetSize": [t.width(), t.height()], "selfPos": [self.x(), self.y()], "selfSize": [self.width(), self.height()]}
-
-					if _id % 2 == 0:
-						nity = ni
-						nitx = ni
-
-					else:
-						nity = ni
-						nitx = ni
-						#_obj = {"id": ni, "mouse": [QCursor().pos().y(), QCursor().pos().x()], "window": [window.y() - self.titleBarHeight, window.x()], "widget": [t.y(), t.x()]}
-					if _obj["id"] == 0:
-						if _obj["widget"][_id % 2] < _obj["mouse"][_id % 2] - _obj["window"][_id % 2] and _obj["widget"][_id % 2] + 20 > _obj["mouse"][_id % 2] - _obj["window"][_id % 2]:
-							if _id % 2 == 0:
-								self.visualFrame.move((_obj["widget"][_id % 2]), self.y() - 3)
-								self.visualFrame.resize(20, self.height() + 6)
-							else:
-								self.visualFrame.move(self.x() - 3, (_obj["widget"][_id % 2]))
-								self.visualFrame.resize(self.width() + 6, 20)
-							self.visualFrame.raise_()
-							self.valueFrameAdd = [0, _listId]
-							break
-					else:
-						if _obj["widget"][_id % 2] < _obj["mouse"][_id % 2] - _obj["window"][_id % 2] and _obj["widget"][_id % 2] + 13 > _obj["mouse"][_id % 2] - _obj["window"][_id % 2]:
-							if _id % 2 == 0:
-								self.visualFrame.move((_obj["widget"][_id % 2]) - 10, self.y() - 3)
-								self.visualFrame.resize(20, self.height() + 6)
-							else:
-								self.visualFrame.move(self.x() - 3, (_obj["widget"][_id % 2]) - 10)
-								self.visualFrame.resize(self.width() + 6, 20)
-							self.visualFrame.raise_()
-							self.valueFrameAdd = [_obj["id"], _listId]
-							break
-					if _obj["id"] + 1 == len(_list):
-						if _obj["selfPos"][_id % 2] + _obj["selfSize"][_id % 2] - 20 < _obj["mouse"][_id % 2] - _obj["window"][_id % 2] and _obj["selfPos"][_id % 2] + _obj["selfSize"][_id % 2] > _obj["mouse"][_id % 2] - _obj["window"][_id % 2]:
-							if _id % 2 == 0:
-								self.visualFrame.move((_obj["selfPos"][_id % 2] + _obj["selfSize"][_id % 2]) - 20, self.y() - 3)
-								self.visualFrame.resize(20, self.height() + 6)
-							else:
-								self.visualFrame.move(self.x() - 3, (_obj["selfPos"][_id % 2] + _obj["selfSize"][_id % 2]) - 20)
-								self.visualFrame.resize(self.width() + 6, 20)
-							self.visualFrame.raise_()
-							self.valueFrameAdd = [_obj["id"] + 1, _listId]
-							break
-				
-					if _obj["widget"][::-1][_id % 2] < _obj["mouse"][::-1][_id % 2] - _obj["window"][::-1][_id % 2] and _obj["widget"][::-1][_id % 2] + 20 > _obj["mouse"][::-1][_id % 2] - _obj["window"][::-1][_id % 2]:
-						if _obj["widget"][_id % 2] < _obj["mouse"][_id % 2] - _obj["window"][_id % 2] and _obj["widget"][_id % 2] + _obj["widgetSize"][_id % 2] > _obj["mouse"][_id % 2] - _obj["window"][_id % 2]:
-							if _id % 2 != 0:
-								self.visualFrame.move((_obj["widget"][::-1][_id % 2]), _obj["widget"][_id % 2] - 3)
-								self.visualFrame.resize(20, _obj["widgetSize"][_id % 2] + 6)
-							else:
-								self.visualFrame.move(self.x() - 3, (_obj["widget"][::-1][_id % 2]))
-								self.visualFrame.resize(self.width() + 6, 20)
-							self.visualFrame.raise_()
-							self.valueFrameAdd = [_obj["id"], _listId, ["add", 0]]
-							break
-
-					'''if nity == 0:
-						if t.y() < QCursor().pos().y() - window.y() - self.titleBarHeight and t.y() + 20 > QCursor().pos().y() - window.y() - self.titleBarHeight:
-							self.visualFrame.move(self.x() - 3, (t.y()))
+					if t == 0:
+						if self.attachedWidgets[t].y() < QCursor().pos().y() - window.y() - self.titleBarHeight < self.attachedWidgets[t].y() + 20:
+							self.visualFrame.move(self.x() - 3, (self.attachedWidgets[t].y()))
 							self.visualFrame.resize(self.width() + 6, 20)
 							self.visualFrame.raise_()
 							#self.visualFrame.show()
-							self.valueFrameAdd = [0, _listId]
+							self.valueFrameAdd = [0]
 							break
 					else:
-						if t.y() - 7 < QCursor().pos().y() - window.y() - self.titleBarHeight and t.y() + 13 > QCursor().pos().y() - window.y() - self.titleBarHeight:
-							self.visualFrame.move(self.x() - 3, (t.y() - 10))
+						if self.attachedWidgets[t].y() - 7 < QCursor().pos().y() - window.y() - self.titleBarHeight and self.attachedWidgets[t].y() + 13 > QCursor().pos().y() - window.y() - self.titleBarHeight:
+							self.visualFrame.move(self.x() - 3, (self.attachedWidgets[t].y() - 10))
 							self.visualFrame.resize(self.width() + 6, 20)
 							self.visualFrame.raise_()
 							#self.visualFrame.show()
-							self.valueFrameAdd = [nity, _listId]
+							self.valueFrameAdd = [t]
 							break
-					if nity + 1 == len(_list) or nitx != 0:
+					if t + 1 == len(self.attachedWidgets):
 						if self.y() + self.height() - 20 < QCursor().pos().y() - window.y() - self.titleBarHeight and self.y() + self.height() > QCursor().pos().y() - window.y() - self.titleBarHeight:
 							self.visualFrame.move(self.x() - 3, (self.y() + self.height() - 20))
 							self.visualFrame.resize(self.width() + 6, 20)
 							self.visualFrame.raise_()
 							#self.visualFrame.show()
-							self.valueFrameAdd = [nity + 1, _listId]
+							self.valueFrameAdd = [t + 1]
 							break
-					if nitx == 0:
-						if t.x() < QCursor().pos().x() - window.x() and t.x() + 20 > QCursor().pos().x() - window.x():
-							self.visualFrame.move(t.x(), self.y() + t.y() - 3)
-							self.visualFrame.resize(20, t.height() + 6)
+
+					if self.attachedWidgets[t].y() + self.attachedWidgets[t].height() > QCursor().pos().y() - window.y() - self.titleBarHeight and self.attachedWidgets[t].y() < QCursor().pos().y() - window.y() - self.titleBarHeight:
+						if self.attachedWidgets[t].x() + 20 > QCursor().pos().x() - window.x() and self.attachedWidgets[t].x() < QCursor().pos().x() - window.x():
+							self.visualFrame.move((self.attachedWidgets[t].x()), self.attachedWidgets[t].y() - 3)
+							self.visualFrame.resize(20, self.attachedWidgets[t].height() + 6)
 							self.visualFrame.raise_()
 							#self.visualFrame.show()
-							self.valueFrameAdd = [0, _listId]
+							self.valueFrameAdd = [t, 0]
 							break
-					else:
-						if t.x() - 7 < QCursor().pos().x() - window.x() and t.x() + 13 > QCursor().pos().x() - window.x():
-							self.visualFrame.move(t.x() - 10, self.y() + t.y() - 3)
-							self.visualFrame.resize(20, t.height() + 6)
+						if self.attachedWidgets[t].x() + self.attachedWidgets[t].width() > QCursor().pos().x() - window.x() and self.attachedWidgets[t].x() + self.attachedWidgets[t].width() - 20 < QCursor().pos().x() - window.x():
+							self.visualFrame.move((self.attachedWidgets[t].x() + self.attachedWidgets[t].width() - 20), self.attachedWidgets[t].y() - 3)
+							self.visualFrame.resize(20, self.attachedWidgets[t].height() + 6)
 							self.visualFrame.raise_()
 							#self.visualFrame.show()
-							self.valueFrameAdd = [nitx, _listId]
+							self.valueFrameAdd = [t, 1]
 							break
-					if nitx + 1 == len(_list) or nity != 0:
-						if self.x() + self.width() - 20 < QCursor().pos().x() - window.x() and self.x() + self.width() > QCursor().pos().x() - window.x():
-							self.visualFrame.move(self.x() + self.width() - 20, self.y() + t.y() - 3)
-							self.visualFrame.resize(20, t.height() + 6)
-							self.visualFrame.raise_()
-							#self.visualFrame.show()
-							self.valueFrameAdd = [nitx, _listId]
-							break'''
-
-					'''if self.attachedWidgets[t].x() - 7 < QCursor().pos().x() - window.x() and self.attachedWidgets[t].x() + 13 > QCursor().pos().x() - window.x():
-						self.visualFrame.move((self.attachedWidgets[t].x() - 10), self.y() - 3)
-						self.visualFrame.resize(20, self.height() + 6)
-						self.visualFrame.raise_()
-						#self.visualFrame.show()
-						self.valueFrameAdd = t
-						break'''
-
-				ni += 1
-		_Temp(self.attachedWidgets)
-		"""
-
-		for t in range(int(len(self.attachedWidgets))):
-			if type(self.attachedWidgets[t]) is list:
-				pass
-			else:
-				if t == 0:
-					if self.attachedWidgets[t].y() < QCursor().pos().y() - window.y() - self.titleBarHeight < self.attachedWidgets[t].y() + 20:
-						self.visualFrame.move(self.x() - 3, (self.attachedWidgets[t].y()))
-						self.visualFrame.resize(self.width() + 6, 20)
-						self.visualFrame.raise_()
-						#self.visualFrame.show()
-						self.valueFrameAdd = [0]
-						break
-				else:
-					if self.attachedWidgets[t].y() - 7 < QCursor().pos().y() - window.y() - self.titleBarHeight and self.attachedWidgets[t].y() + 13 > QCursor().pos().y() - window.y() - self.titleBarHeight:
-						self.visualFrame.move(self.x() - 3, (self.attachedWidgets[t].y() - 10))
-						self.visualFrame.resize(self.width() + 6, 20)
-						self.visualFrame.raise_()
-						#self.visualFrame.show()
-						self.valueFrameAdd = [t]
-						break
-				if t + 1 == len(self.attachedWidgets):
-					if self.y() + self.height() - 20 < QCursor().pos().y() - window.y() - self.titleBarHeight and self.y() + self.height() > QCursor().pos().y() - window.y() - self.titleBarHeight:
-						self.visualFrame.move(self.x() - 3, (self.y() + self.height() - 20))
-						self.visualFrame.resize(self.width() + 6, 20)
-						self.visualFrame.raise_()
-						#self.visualFrame.show()
-						self.valueFrameAdd = [t + 1]
-						break
-
-				if self.attachedWidgets[t].y() + self.attachedWidgets[t].height() > QCursor().pos().y() - window.y() - self.titleBarHeight and self.attachedWidgets[t].y() < QCursor().pos().y() - window.y() - self.titleBarHeight:
-					if self.attachedWidgets[t].x() + 20 > QCursor().pos().x() - window.x() and self.attachedWidgets[t].x() < QCursor().pos().x() - window.x():
-						self.visualFrame.move((self.attachedWidgets[t].x()), self.attachedWidgets[t].y() - 3)
-						self.visualFrame.resize(20, self.attachedWidgets[t].height() + 6)
-						self.visualFrame.raise_()
-						#self.visualFrame.show()
-						self.valueFrameAdd = [t, 0]
-						break
-					if self.attachedWidgets[t].x() + self.attachedWidgets[t].width() > QCursor().pos().x() - window.x() and self.attachedWidgets[t].x() + self.attachedWidgets[t].width() - 20 < QCursor().pos().x() - window.x():
-						self.visualFrame.move((self.attachedWidgets[t].x() + self.attachedWidgets[t].width() - 20), self.attachedWidgets[t].y() - 3)
-						self.visualFrame.resize(20, self.attachedWidgets[t].height() + 6)
-						self.visualFrame.raise_()
-						#self.visualFrame.show()
-						self.valueFrameAdd = [t, 1]
-						break
 
 		
 
