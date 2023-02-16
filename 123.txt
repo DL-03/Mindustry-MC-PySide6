@@ -1,1 +1,1 @@
-pyinstaller --noconsole --onefile "C:\Users\DL\Desktop\Mindustry Mod Construct\WindowTest.py"
+pyinstaller --noconsole --onefile "D:\Desktop\PycharmProjects\Mindustry-MC\MainNew.py"

@@ -1,7 +1,7 @@
-from PyQt6 import QtCore
-from PyQt6.QtCore import QRect, QTimer
-from PyQt6.QtGui import QFont, QFontDatabase
-from PyQt6.QtWidgets import QApplication, QFrame, QLabel, QPushButton, QScrollBar, QStyle, QStyleOptionTitleBar, QMainWindow
+from PySide6 import QtCore
+from PySide6.QtCore import QRect, QTimer
+from PySide6.QtGui import QFont, QFontDatabase
+from PySide6.QtWidgets import QApplication, QFrame, QLabel, QPushButton, QScrollBar, QStyle, QStyleOptionTitleBar, QMainWindow
 
 
 id = QFontDatabase.addApplicationFont("font.ttf")

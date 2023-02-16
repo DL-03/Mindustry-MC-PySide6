@@ -1,6 +1,8 @@
-
+from collections import OrderedDict
 import collections
 from json.decoder import JSONDecodeError
+
+#from numba import jit
 
 from PIL import Image
 from PIL.ImageQt import ImageQt
@@ -12,19 +14,31 @@ import shutil
 from pathlib import Path
 
 import json
-from PyQt6 import QtGui
+from PySide6 import QtGui
 import hjson
 
-from PyQt6.QtCore import QPoint, QRect, QDir, QAbstractTableModel, QSize, QTime, QTimer, Qt
-from PyQt6 import QtCore
-from PyQt6.QtWidgets import QApplication, QDialog, QDialogButtonBox, QDockWidget, QFocusFrame, QFrame, QLabel, QLayout, QLineEdit, QListWidget, QMainWindow, QMenu, QMenuBar, QPushButton, QScrollBar, QStyle, QStyleOptionTitleBar, QTabWidget, QTreeView, QVBoxLayout, QWidget, QFileDialog, QMessageBox, QCheckBox, QScrollArea, QHBoxLayout, QGridLayout, QComboBox, QTextEdit, QToolBar, QGraphicsTextItem, QGraphicsItem
-from PyQt6.QtGui import QPainter, QColor, QFont, QPixmap, QFileSystemModel, QFontDatabase, QTextLine, QAction, QColor
+from PySide6.QtCore import QPoint, QRect, QDir, QAbstractTableModel, QSize, QTime, QTimer, Qt, QPropertyAnimation
+from PySide6 import QtCore
+from PySide6.QtWidgets import QApplication, QFileSystemModel, QDialog, QDialogButtonBox, QDockWidget, QFocusFrame, QFrame, QLabel, QLayout, QLineEdit, QListWidget, QMainWindow, QMenu, QMenuBar, QPushButton, QScrollBar, QStyle, QStyleOptionTitleBar, QTabWidget, QTreeView, QVBoxLayout, QWidget, QFileDialog, QMessageBox, QCheckBox, QScrollArea, QHBoxLayout, QGridLayout, QComboBox, QTextEdit, QToolBar, QGraphicsTextItem, QGraphicsItem
+from PySide6.QtGui import QPainter, QColor, QFont, QPixmap, QFontDatabase, QTextLine, QAction, QColor, QIntValidator, \
+	QDesktopServices
 from hjson.scanner import HjsonDecodeError
+import glob
+
+from DrawWindow import DrawWindow, FrameResizer, MindustryButton, NewScrollArea
+from DrawWindow import AttachebleFrame as AttachWidgetFrame
+from MessagePanel import SummonMessage
+
+readyBuild = True
+programInfo = {"verName": "Pre-Beta", "ver": 1}
 
 
+qApp.shutdown()
+app = QApplication(sys.argv)
 
 window_close = True
 
+windowMoved = None
 window = None
 MaiL = None
 
@@ -37,10 +51,12 @@ _tempButtonContent = None
 
 TempZipPath = ""
 ContentObject = {"Mod": {}, "Path": None, "Type": ["", ""], "Text": "", "visualWidget": {}}
-RootMod = [{}, ""]
+RootMod = [{}, "", ""]
 EditRoot = [0, ""]
 
-StyleSheetList = ["QPushButton { font-family: fontello; font-size: 10 px; background-color:#000000; border-style: solid; border-width: 3px; border-color: #454545; color: #ffffff; } QPushButton:hover {border-color: #ffd37f;} QFrame { font-family: fontello; font-size: 10 px; background-color:#000000; border-style: solid; border-width: 3px; border-color: #454545; color: #ffffff; }", 
+MindustryColors = {"teams": {"yellow":"#ffd37f", "green":"#84f490", "red": "#f15352"}}
+
+StyleSheetList = ["QPushButton { font-family: fontello; font-size: 10 px; background-color:#000000; border-style: solid; border-width: 3px; border-color: #454545; color: #ffffff; } QPushButton:hover {border-color: #ffd37f;} QPushButton:disabled {border-color: "+MindustryColors["teams"]["red"]+"; color: "+MindustryColors["teams"]["red"]+"} QFrame { font-family: fontello; font-size: 10 px; background-color:#000000; border-style: solid; border-width: 3px; border-color: #454545; color: #ffffff; }",
 				  "QPushButton { font-family: fontello; font-size: 10 px; background-color:#00000000; border-style: solid; border-width: 3px; border-color: #454545; color: #ffffff; } QPushButton:hover { border-color: #ffd37f; }", 
 				  "QPushButton { font-family: fontello; font-size: 10 px; background-color:#000000; border-style: solid; border-width: 1px; border-color: #454545; color: #ffffff; } QPushButton:hover { border-color: #ffd37f; } QPushButton:disabled { border-color: #84f490; }"]
 
@@ -220,6 +236,8 @@ class MainWindow(QMainWindow):
 		files = [u.toLocalFile() for u in event.mimeData().urls()]
 		for f in files:
 			print(f)'''
+
+"""
 class DrawWindow(QFrame):
 	def TimerUpdate(self):
 		
@@ -643,10 +661,9 @@ class DrawWindow(QFrame):
 	def mousePressEvent(self, event):
 		self.raise_()
 		self.upPanel.raise_()
-		
+"""
 
 
-app = QApplication(sys.argv)
 
 window = MainWindow()
 
@@ -798,6 +815,50 @@ def openFiler(pathF):
 	print(opsa)
 	return opsa
 
+def jsonToDict(_text):
+	_tempCon = ""
+
+	for o in _text:
+		if o == "'":
+			_tempCon += '"'
+		else:
+			_tempCon += o
+
+	data = None
+
+
+
+	# data = json.loads(_tempCon)
+	# print("json")
+	try:
+		data = json.loads(_tempCon)
+	except Exception:
+		try:
+			data = hjson.loads(_tempCon)
+		except Exception:
+			try:
+				data = json.loads(_text)
+			except Exception:
+				data = hjson.loads(_text)
+	if data == {}:
+		# data = hjson.loads(_tempCon)
+		try:
+			data = hjson.loads(_tempCon)
+		except Exception:
+			try:
+				data = hjson.loads(_text)
+			except Exception:
+				pass
+		# try:
+		#	data = json.load(f)
+		# except JSONDecodeError:
+		#	data = json.loads(_tempCon)
+	if data == {}:
+		try:
+			data = json.loads(_tempCon)
+		except Exception:
+			data = hjson.loads(_tempCon)
+	return data
 ContentL = []
 ContentL1 = []
 	
@@ -858,7 +919,7 @@ def MainL():
 	def CloseMod():
 		global TempZipPath, RootMod, ContentObject
 		TempZipPath = ""
-		RootMod = [{}, ""]
+		RootMod = [{}, "", ""]
 		#ContentObject = {"Mod": {}, "Path": None, "Type": ["", ""], "Text": "", "visualWidget": {}}
 
 
@@ -879,23 +940,26 @@ def MainL():
 		IconMod.setPixmap(QPixmap().fromImage(ImageQt(Logo).copy()))
 
 		WindowTree.tree.hide()
-		
+		WindowTree.treeWidget.clearItems()
+
+		WindowTree.selectedTab = None
+		WindowTree.updateTabs()
+
 		CloseContentObject()
 
 		SummonMessage("Мод был Закрыт!")
 
-	#_GetOpenMode = QWidget()
-	#_GetOpenMode.setStyleSheet("background-color: #252525")
-	#_GetOpenMode.setWindowTitle("Открыть Мод Как?")
+
+
 
 
 	class GetOpenMode(DrawWindow):
 		def __init__(self):
-			super().__init__()
-			self.upPanel.setTitle("Открыть Мод Как?")
-			self.setMinimumSize(300, 75)
-			self.setMaximumSize(300, 75)
-			self.resize(300, 75)
+			super().__init__(window)
+			self.upPanel.setTitle(" Открыть Мод Как?")
+			self.setMinimumSize(300, 100)
+			self.setMaximumSize(300, 100)
+			self.resize(300, 100)
 			self.upPanel.closeWindow()
 
 			self.window.layout = QGridLayout(self)
@@ -906,29 +970,243 @@ def MainL():
 			self.window._Label.setStyleSheet("color: #ffffff")
 
 
-			self.window.button0 = QPushButton("Папка")
-			self.window.button0.setStyleSheet(StyleSheetList[0])
-			self.window.button0.setFont(QFont(families[0], 12))
+			self.window.button0 = MindustryButton()
+			self.window.button0.setText("Папка")
+			self.window.button0.setMinimumSize(0, 25)
 			self.window.button0.clicked.connect(lambda: OpenMod(0))
 
-			self.window.button1 = QPushButton("Архив")
-			self.window.button1.setStyleSheet(StyleSheetList[0])
-			self.window.button1.setFont(QFont(families[0], 12))
+			self.window.button1 = MindustryButton()
+			self.window.button1.setText("Архив")
+			self.window.button1.setMinimumSize(0, 25)
 			self.window.button1.clicked.connect(lambda: OpenMod(1))
+
+			self.window.button2 = MindustryButton()
+			if readyBuild:
+				self.window.button2.setText("?????????")
+				self.window.button2.setThem("default", {"border-color": MindustryColors["teams"]["red"], "border-color-hover": MindustryColors["teams"]["red"], "color": MindustryColors["teams"]["red"]})
+			else:
+				self.window.button2.setText("Mindustry")
+			self.window.button2.setMinimumSize(0, 25)
+			self.window.button2.setDisabled(readyBuild)
+			self.window.button2.clicked.connect(lambda: getOpenModeMindustry.show())
 
 			self.window.layout.addWidget(self.window._Label, 0, 0, 1, 0)
 
 			self.window.layout.addWidget(self.window.button0, 1, 0)
 			self.window.layout.addWidget(self.window.button1, 1, 1)
 
+			self.window.layout.addWidget(self.window.button2, 2, 0, 2, 2)
+
 	getOpenMode = GetOpenMode()
 
 
+	class GetOpenModeMindustry(QFrame):
+		def updateTimer(self):
+			self.setGeometry(0, 0, window.width(), window.height())
+			self.closeButton.setGeometry(self.width()/2 - 75 - 160, self.height() - 75, 150, 50)
+			self.guideButton.setGeometry(self.width()/2 - 75, self.height() - 75, 150, 50)
+			self.folderModButton.setGeometry(self.width()/2 - 75 + 160, self.height() - 75, 150, 50)
+			self.ItemsArea.setGeometry(self.width()/2 - 200, 125, 400, self.height() - 135 - 80)
+			self.labelName.setGeometry(self.width()/2 - 100, 5, 200, 25)
+			self.labelRect.setGeometry(5, 30, self.width()-10, 3)
+
+			self.importModButton.setGeometry(self.width()/2 - 175, 40, 175, 50)
+			self.browserModButton.setGeometry(self.width()/2, 40, 175, 50)
+		def show(self):
+			super(GetOpenModeMindustry, self).show()
+			self.raise_()
+		def addRes(self, path=""):
+
+
+			self.Items.append([QFrame(self.ItemsArea.FrameContent), [QLabel(), QLabel(), QLabel(), QLabel()], [QPushButton(), QPushButton()]])
+
+			self.Items[-1][1][0].setParent(self.Items[-1][0])
+			self.Items[-1][1][1].setParent(self.Items[-1][0])
+			self.Items[-1][1][2].setParent(self.Items[-1][0])
+			self.Items[-1][1][3].setParent(self.Items[-1][0])
+			self.Items[-1][2][0].setParent(self.Items[-1][0])
+			self.Items[-1][2][1].setParent(self.Items[-1][0])
+
+			self.Items[-1][0].setGeometry(0, 105*(len(self.Items)-1), self.ItemsArea.width()-5, 100)
+			self.Items[-1][0].setStyleSheet(StyleSheetList[0])
+			#self.Items[-1][0].setStyleSheet("background-color:#ffffff")
+
+			self.Items[-1][1][0].setGeometry(3, 3, 100-6, 100-6)
+			self.Items[-1][1][0].setStyleSheet(StyleSheetList[0])
+
+
+			self.Items[-1][1][1].setGeometry(105, 8, 395-3-100-10-25, 25)
+			self.Items[-1][1][1].setFont(QFont(families[0], 12))
+			#self.Items[-1][1][1].setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
+			self.Items[-1][1][1].setStyleSheet("color: #ffffff; border-width: 0")
+
+			self.Items[-1][1][2].setGeometry(105, 8+30, 395-3-100-10, 25)
+			self.Items[-1][1][2].setFont(QFont(families[0], 12))
+			self.Items[-1][1][2].setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
+			self.Items[-1][1][2].setStyleSheet("color: #ffffff; border-width: 0")
+
+			self.Items[-1][1][3].setGeometry(105, 8+30+30, 395-3-100-10-25, 25)
+			self.Items[-1][1][3].setFont(QFont(families[0], 12))
+			#self.Items[-1][1][3].setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
+			self.Items[-1][1][3].setStyleSheet("color: #ffffff; border-width: 0")
+
+
+			self.Items[-1][2][0].setGeometry(395-30, 0, 30, 30)
+			self.Items[-1][2][0].setFont(QFont(families[0], 12))
+			self.Items[-1][2][0].setStyleSheet(StyleSheetList[0])
+			self.Items[-1][2][0].setStyleSheet("color: #ffffff")
+			self.Items[-1][2][0].setText("")
+
+
+			def openMod():
+				RootMod[0] = rootMod[0]
+				RootMod[1] = rootMod[1]
+				RootMod[2] = "Folder"
+				InitializationMod()
+
+			self.Items[-1][2][1].setGeometry(395-30, 100-30, 30, 30)
+			self.Items[-1][2][1].setFont(QFont(families[0], 12))
+			self.Items[-1][2][1].setStyleSheet(StyleSheetList[0])
+			self.Items[-1][2][1].setStyleSheet("color: #ffffff")
+			self.Items[-1][2][1].setText("")
+			self.Items[-1][2][1].pressed.connect(openMod)
+
+			_mode = 0
+			rootMod = [{}, ""]
+			print(path)
+
+
+			print("[][][]")
+			yop = glob.glob(glob.escape(path)+"/**/mod.json", recursive=True)
+			if yop == []:
+				yop1 = glob.glob(glob.escape(path)+"/**/mod.hjson", recursive=True)
+				if yop1 == []:
+					pass
+				else:
+					rootMod[0] = openFiler(yop1[0])[0]
+					rootMod[1] = yop1[0][:-9]
+			else:
+				rootMod[0] = openFiler(yop[0])[0]
+				rootMod[1] = yop[0][:-8]
+
+
+			if type(rootMod[0]) == str:
+				try:
+					rootMod[0] = dict(jsonToDict(rootMod[0]))
+				except:
+					pass
+
+			print(rootMod)
+			print(dict(rootMod[0]))
+
+
+			try:
+				if os.path.exists(rootMod[1] + "/icon.png"):
+					Logo = Image.open(rootMod[1] + "/icon.png")
+				else:
+					Logo = Image.open("noneMod.png")
+			except Exception:
+				Logo = Image.open("noneMod.png")
+
+			self.Items[-1][1][0].setPixmap(QPixmap().fromImage(ImageQt(Logo).copy()))
+
+			self.Items[-1][1][0].setScaledContents(True)
+			self.Items[-1][1][0].setStyleSheet("border-style: solid; border-width: 2px; border-color: #ffd37f;")
+
+
+			_ttt = ["name", "version", "author"]
+			for p in range(len(_ttt)):
+				try:
+					if "displayName" in rootMod[0] and _ttt[p] == "name":
+						self.Items[-1][1][p+1].setText(coloritaText(str(rootMod[0]["displayName"])))
+					else:
+						self.Items[-1][1][p+1].setText(coloritaText(str(rootMod[0][_ttt[p]])))
+				except:
+					self.Items[-1][1][p+1].setText(coloritaText("[red]None"))
+
+
+
+			self.Items[-1][0].show()
+
+
+
+		def importRes(self, path):
+			for i in os.listdir(path):
+				if os.path.isdir(path+i):
+					self.addRes(path+i)
+		def clearRes(self):
+			for c in self.Items:
+				c[0].deleteLater()
+				c[1][0].deleteLater()
+				c[1][1].deleteLater()
+				c[1][2].deleteLater()
+				c[1][3].deleteLater()
+				c[2][0].deleteLater()
+				c[2][1].deleteLater()
+			self.Items = []
+		def __init__(self):
+			super(GetOpenModeMindustry, self).__init__(window)
+			self.setStyleSheet("background-color: rgba(0, 0, 0, 125)")
+			self.hide()
+
+			self.labelName = QLabel(self, text="Модификации")
+			self.labelName.setStyleSheet("color:"+MindustryColors["teams"]["yellow"])
+			self.labelName.setFont(QFont(families[0], 12))
+			self.labelName.setAlignment(QtCore.Qt.AlignCenter | QtCore.Qt.AlignVCenter)
+
+			self.labelRect = QFrame(self)
+			self.labelRect.setStyleSheet("background-color:"+MindustryColors["teams"]["yellow"])
+
+
+			self.closeButton = MindustryButton(self)
+			self.closeButton.pressed.connect(lambda: self.hide())
+			self.closeButton.setText("<-     Назад")
+
+			self.guideButton = MindustryButton(self)
+			self.guideButton.pressed.connect(lambda: self.hide())
+			self.guideButton.setText("Руководство по \n модификациям")
+
+			self.folderModButton = MindustryButton(self)
+			self.folderModButton.pressed.connect(lambda: self.hide())
+			self.folderModButton.setText("Открить папку с \n модификациями")
+
+			self.importModButton = QPushButton(self)
+			self.importModButton.pressed.connect(lambda: self.hide())
+			self.importModButton.setStyleSheet(StyleSheetList[0])
+			self.importModButton.setText("Импортировать \n модификацию")
+
+			self.browserModButton = QPushButton(self)
+			self.browserModButton.pressed.connect(lambda: self.hide())
+			self.browserModButton.setStyleSheet(StyleSheetList[0])
+			self.browserModButton.setText("Браузер \n модификаций")
+
+
+			self.ItemsArea = NewScrollArea(self)
+			self.Items = []
+
+
+			self.qTimer = QTimer()
+			self.qTimer.setInterval(1000)
+			self.qTimer.timeout.connect(self.updateTimer)
+			self.qTimer.start()
+
+			self.updateTimer()
+
+		def show(self):
+			super(GetOpenModeMindustry, self).show()
+
+			self.clearRes()
+			if os.path.exists(os.path.expanduser('~') + "/AppData/Roaming/Mindustry/mods/"):
+				self.importRes(os.path.expanduser('~') + "/AppData/Roaming/Mindustry/mods/")
+			self.raise_()
+
+
+	getOpenModeMindustry = GetOpenModeMindustry()
 	
 	class GetCreateFile(DrawWindow):
 		def __init__(self):
-			super().__init__()
-			self.upPanel.setTitle("Создать Файл")
+			super().__init__(window)
+			self.upPanel.setTitle(" Создать Файл")
 			self.upPanel.closeWindow()
 
 
@@ -1030,9 +1308,9 @@ def MainL():
 							_mod = DefaultFileSave[_rootType][_type]
 							_mod["name"] = self._nameFile1.text()
 							if self._formatFileChoose1.currentText() == "json":
-								_text = json.dumps(DefaultFileSave[_rootType][_type])
+								_text = json.dumps(DefaultFileSave[_rootType][_type], indent=2)
 							else:
-								_text = hjson.dumps(DefaultFileSave[_rootType][_type])
+								_text = hjson.dumps(DefaultFileSave[_rootType][_type], indent=2)
 
 							_file = open(_filePath, "x")
 							_file.write(_text)
@@ -1079,10 +1357,9 @@ def MainL():
 		#_GetCreateFile.show()
 
 
-	CreateObj = QPushButton(window, text="Создать")
-	CreateObj.setFont(QFont(families[0], 12))
-	CreateObj.setStyleSheet(StyleSheetList[0])
-	CreateObj.clicked.connect(getCreateFile.upPanel.openWindow)
+
+
+
 
 
 	
@@ -1201,7 +1478,7 @@ def MainL():
 
 	IconMod = _IconMod()
 	
-	ModOpenButton.clicked.connect(lambda: SelLC(Type = "mod"))
+	ModOpenButton.clicked.connect(lambda: SelectTree(Type ="mod"))
 
 	def ModArchiveSave():
 		zip_directory(RootMod[1], TempZipPath[:-4])
@@ -1226,6 +1503,7 @@ def MainL():
 	ModNewButton.resize(30, 30)
 	ModNewButton.setStyleSheet(StyleSheetList[0])
 	ModNewButton.setToolTip("Создать Мод")
+	ModNewButton.setDisabled(readyBuild)
 	#ModNewButton.clicked.connect(ModArchiveSave)
 
 	
@@ -1274,7 +1552,7 @@ def MainL():
 	
 	
 
-	class AttachWidgetFrame(QFrame):
+	class AttachWidgetFrame1(QFrame):
 		def setBaseGeometry(self, _x, _y, _width, _height):
 			self.baseGeometry = QRect(_x, _y, _width, _height)
 		def setBaseGeometry(self, qRect):
@@ -1291,10 +1569,10 @@ def MainL():
 			
 			#self.widgets = _widgets
 
-			'''self.qTimer = QTimer()
+			self.qTimer = QTimer()
 			self.qTimer.setInterval(100)
 			self.qTimer.timeout.connect(self.update)
-			self.qTimer.start()'''
+			self.qTimer.start()
 
 			self.attachedWidget = None
 
@@ -1303,21 +1581,24 @@ def MainL():
 			#self.ok = False
 
 			#print(self.titleBarHeight)
-		'''def update(self):
+		def itemAdd(self, p):
+			if self.attachedWidget == None:
+				self.attachedWidget = p
+		def itemDel(self, p):
+			self.attachedWidget = None
+		def update(self):
+			for i in self.widgets:
+				self.setStyleSheet("border-style: solid; border-width: 3px; border-color: #454545; color: #ffffff")
 
-			if self.isAttached == False:
-				for i in self.widgets:
-					self.setStyleSheet("border-style: solid; border-width: 3px; border-color: #454545; color: #ffffff")
-				
-					if i.attachedWidget != None:
-						break
-					if i.upPanel.mi:
-						self.ok = False
-						if QtGui.QCursor.pos().x() - window.x() > self.x() and QtGui.QCursor.pos().x() - window.x() < self.x() + self.width():
-							if QtGui.QCursor.pos().y() - window.y() - self.titleBarHeight > self.y() and QtGui.QCursor.pos().y() - window.y() - self.titleBarHeight < self.y() + self.height():
-								#print(self.mousePos.x())
-								self.setStyleSheet("border-style: dashed; border-width: 3px; border-color: #ffd37f; color: #ffffff")
-								self.ok = True
+				if i.attachedWidget != None:
+					break
+				if i.upPanel.mi:
+					self.ok = False
+					if QtGui.QCursor.pos().x() - window.x() > self.x() and QtGui.QCursor.pos().x() - window.x() < self.x() + self.width():
+						if QtGui.QCursor.pos().y() - window.y() - self.titleBarHeight > self.y() and QtGui.QCursor.pos().y() - window.y() - self.titleBarHeight < self.y() + self.height():
+							#print(self.mousePos.x())
+							self.setStyleSheet("border-style: dashed; border-width: 3px; border-color: #ffd37f; color: #ffffff")
+							self.ok = True
 
 								
 
@@ -1331,7 +1612,7 @@ def MainL():
 
 									self.isAttached = True
 
-									break'''
+									break
 
 
 
@@ -1349,54 +1630,43 @@ def MainL():
 	
 	class CustomizationWindow():
 		def timer(self):
+			self.treeWidgetFrame._x = 0
+			self.treeWidgetFrame._y = 75
 
-			if self.editorWidgetFrame.attachedWidget != None:
-				editorGeometry = QRect(self.editorWidgetFrame.attachedWidget.geometry())
-			else:
-				editorGeometry = QRect(0, 0, int(window.width()/2), 0)
-					
-			if self.treeWidgetFrame.attachedWidget != None:
-				treeGeometry = QRect(self.treeWidgetFrame.attachedWidget.geometry())
-			else:
-				treeGeometry = QRect(0, 0, int(window.width()/2), 0)
+			self.treeWidgetFrame._width = 300
+			self.treeWidgetFrame._height = window.height() - 105
 
 
+			self.editorWidgetFrame._x = 300
+			self.editorWidgetFrame._y = 75
 
-			if self.editorWidgetFrame.attachedWidget != None:
-				#self.treeWidgetFrame.attachedWidget.resize(self.treeWidgetFrame.attachedWidget.width(), 800-105)
+			self.editorWidgetFrame._width = window.width()-300
+			self.editorWidgetFrame._height = window.height() - 105
 
-				#if self.treeWidgetFrame.attachedWidget != None:
-				self.editorWidgetFrame.move(window.width() - editorGeometry.width(), 75)
-				self.editorWidgetFrame.resize(window.width() - treeGeometry.width(), window.height()-105)
-
-
-			else:
-				#if self.treeWidgetFrame.attachedWidget != None:
-				self.editorWidgetFrame.move(self.treeWidgetFrame.width(), 75)
-				self.editorWidgetFrame.resize(window.width() - treeGeometry.width(), window.height()-105)
-				#else:
-				#	self.editorWidgetFrame.move(int(window.width()/2), 75)
-				#	self.editorWidgetFrame.resize(int(window.width()/2), window.height()-105)
-			if self.treeWidgetFrame.attachedWidget == None:
-				
-
-
-				#if self.editorWidgetFrame.attachedWidget != None:
-				self.treeWidgetFrame.resize(window.width() - editorGeometry.width(), window.height()-105)
-				#else:
-				#	self.treeWidgetFrame.resize(int(window.width()/2), window.height()-105)
-			else:
-				self.treeWidgetFrame.attachedWidget.resize(treeGeometry.width(), window.height()-105)
-				self.treeWidgetFrame.resize(treeGeometry.width(), window.height()-105)
 		def __init__(self):
-			self.treeWidgetFrame = AttachWidgetFrame()
-			self.editorWidgetFrame = AttachWidgetFrame()
+			self.treeWidgetFrame = AttachWidgetFrame(_varLocal=window)
+			self.editorWidgetFrame = AttachWidgetFrame(_varLocal=window)
 
-			self.treeWidgetFrame.move(0, 75)
-			self.treeWidgetFrame.resize(int(window.width()/2), window.height()-105)
+			self.treeWidgetFrame._widgetMax = 1
+			self.editorWidgetFrame._widgetMax = 1
 
-			self.editorWidgetFrame.move(int(window.width()/2), 75)
-			self.editorWidgetFrame.resize(int(window.width()/2), window.height()-105)
+			attachebleWidgets.append(self.treeWidgetFrame)
+			attachebleWidgets.append(self.editorWidgetFrame)
+
+
+			#self.treeWidgetFrame.move(0, 75)
+			self.treeWidgetFrame._x = 0
+			self.treeWidgetFrame._y = 75
+			#self.treeWidgetFrame.resize(int(window.width()/2), window.height()-105)
+			self.treeWidgetFrame._width = 300
+			self.treeWidgetFrame._height = window.height() - 105
+
+			#self.editorWidgetFrame.move(int(window.width()/2), 75)
+			self.editorWidgetFrame._x = 300
+			self.editorWidgetFrame._y = 75
+			#self.editorWidgetFrame.resize(int(window.width()/2), window.height()-105)
+			self.editorWidgetFrame._width = int(window.width()/2)-300
+			self.editorWidgetFrame._height = window.height()-105
 			#self.editorWidgetFrame.move(300, 75)
 			#self.editorWidgetFrame.resize(700, 800-105-300)
 			#self.editorWidgetFrame.
@@ -1409,121 +1679,374 @@ def MainL():
 	customizationWindow = CustomizationWindow()
 
 	class windowTree(DrawWindow):
+		def updateGraphics(self):
+			self.tree.setGeometry(0, 45, self.width(), self.height() - 45)
 		def __init__(self):
-			super().__init__()
-			self.upPanel.setTitle("Древо Контента")
+			super().__init__(window, attachebleWidgets)
+			self.upPanel.setTitle(" Древо Контента")
 			self.setMaximumWidth(300)
-
-			self.layoutTreeWidget = QGridLayout(self)
-			self.layoutTreeWidget.setSpacing(0)
 
 			self.upPanel.openWindow()
 
-			
+			self.selectedTab = None
+			RootWidget = self
 
 			self.attach(customizationWindow.treeWidgetFrame)
 	
 
-			self.tree = QTreeView()
+			self.tree = QTreeView(self)
 			self.tree.hide()
 			self.model = QFileSystemModel()
 			self.tree.setStyleSheet("color: #ffffff; border-style: solid; border-width: 3 px; border-color: #454545;")
-			#tree.setGeometry(0, 75, 300, window.height() - (75 + 30))
 
-	
+			root = self
 
-			def ChooseTypeContent(_button = None):
-				global _tempButtonContent, EditRoot
-				if _tempButtonContent == None:
-					_type = buttonTreeBlocks.text()
-					_button.setDisabled(True)
+			class TreeWidget(QWidget):
+				def TimerUpdate(self):
+					self.resize(root.width(), root.height() - 50)
+					#print(self.width())
+					#print(self.height())
+					self.AreaItems.adjustSize()
+
+					self.scrollBar.resize(self.scrollBar.width(), self.height())
+					self.scrollBar.move(self.width() - self.scrollBar.width(), 0)
+					self.scrollBar.setMaximum(self.AreaItems.height())
+					self.scrollBar.setMinimum(self.height())
+				def addItems(self, iconPath = None, nameFile = "", filePath = ""):
+					class buttonOpenContent(QPushButton):
+						def __init__(self):
+							super(buttonOpenContent, self).__init__()
+						def mouseDoubleClickEvent(self, event: QtGui.QMouseEvent) -> None:
+							SelectTree(_newTreeOpen={"path": filePath})
+					self.Items.append([QWidget(self.AreaItems), [QLabel(), QLabel()], buttonOpenContent()])
+
+					self.Items[-1][0].setStyleSheet("border-style: solid; border-width: 3; border-color: #454545;")
+					self.Items[-1][2].setStyleSheet("QPushButton {background-color: #00000000; border-style: solid; border-width: 3; border-color: #454545;} QPushButton:hover {border-color: #ffd37f;}")
+
+					self.Items[-1][1][0].setParent(self.Items[-1][0])
+					self.Items[-1][1][1].setParent(self.Items[-1][0])
+
+					self.Items[-1][2].setParent(self.Items[-1][0])
+					self.Items[-1][2].raise_()
+
+					self.Items[-1][0].setGeometry(5, 35*(len(self.Items)-1), 300-10, 30)
+					self.Items[-1][2].setGeometry(0, 0, self.Items[-1][0].width(), self.Items[-1][0].height())
+
+					self.Items[-1][1][0].setGeometry(2, 2, 30-4, 30-4)
+
+					self.Items[-1][1][1].setGeometry(35, 3, self.Items[-1][0].width()-40, 24)
+					#self.Items[-1][1][0].setGeometry(35, 3, self.Items[-1][0].width()-40, 24)
+
+					self.Items[-1][1][1].setFont((families[0], 12))
+					self.Items[-1][1][1].setStyleSheet("color: #ffffff; border-width: 0")
+					try:
+						_mod = openFiler(filePath)[0]
+					except:
+						_mod == None
+					_name = os.path.basename(filePath)
+
+					if _mod == None:
+						self.Items[-1][1][1].setText(_name + " !")
+						self.Items[-1][1][1].setStyleSheet("color:"+MindustryColors["teams"]["red"]+"; border-width: 0")
+					elif "name" in _mod:
+						self.Items[-1][1][1].setText(_mod["name"])
+					else:
+						self.Items[-1][1][1].setText(_name)
+
+					ImageObj = None
+
+					_path = filePath
+
+					Type = ""
+					if _mod == None:
+						pass
+					elif "type" in _mod:
+						Type = str(_mod["type"]).lower()
+					if 1==1:
+						try:
+							if Type == "drill":
+								if os.path.exists(ImagOPT(toPng(os.path.basename(_path)))):
+									ImageObj = Image.open(ImagOPT(toPng(os.path.basename(_path))))
+									ImageObj1 = ImageObj.copy()
+								else:
+									ImageObj = Image.open("error.png")
+								if os.path.exists(ImagOPT(toPng(os.path.basename(_path), "-rotator"))):
+									_tempImg = Image.open(ImagOPT(toPng(os.path.basename(_path), "-rotator")))
+								else:
+									ImageObj = Image.open("error.png")
+								ImageObj1.paste(_tempImg, (0, 0), _tempImg)
+								if os.path.exists(ImagOPT(toPng(os.path.basename(_path), "-top"))):
+									_tempImg = Image.open(ImagOPT(toPng(os.path.basename(_path), "-top")))
+								else:
+									ImageObj = Image.open("error.png")
+								ImageObj1.paste(_tempImg, (0, 0), _tempImg)
+								ImageObj = ImageObj1
+							elif ContentObject["Type"][0] == "mod":
+								if os.path.exists(RootMod[1] + "/icon.png"):
+									ImageObj = Image.open(RootMod[1] + "/icon.png")
+							else:
+								if os.path.exists(ImagOPT(toPng(os.path.basename(_path)))):
+									ImageObj = Image.open(ImagOPT(toPng(os.path.basename(_path))))
+
+							ImageObj = QPixmap().fromImage(ImageQt(ImageObj).copy())
+							self.Items[-1][1][0].setPixmap(ImageObj)
+						except Exception:
+							ImageObj = Image.open("error.png")
+							ImageObj = QPixmap().fromImage(ImageQt(ImageObj).copy())
+							self.Items[-1][1][0].setPixmap(ImageObj)
+
+
+					self.Items[-1][1][0].setScaledContents(True)
+					self.Items[-1][1][0].setStyleSheet("border-style: solid; border-width: 2px; border-color: #ffd37f;")
+
+
+					self.Items[-1][0].show()
+					#self.Items[-1][2].mouseDoubleClickEvent.connect(lambda: )
+					print(len(self.Items))
+
+
+
+
+				def clearItems(self):
+					for i in self.Items:
+						i[0].deleteLater()
+						i[1][0].deleteLater()
+						i[1][1].deleteLater()
+						i[2].deleteLater()
+					self.Items = []
+				def __init__(self):
+					super(TreeWidget, self).__init__(root)
+
+					self.Items = []
+
+					self.AreaItems = QWidget(self)
+					#self.setStyleSheet("background-color: #000000")
+					#self.AreaItems.setStyleSheet("background-color:#ffffff")
+
+					#self.f = QPushButton(self.AreaItems, "wtqeuywtrwyu")
+					#self.f.resize(100, 1000)
+
+					main = self
+					class ScrollBar(QScrollBar):
+						def __init__(self):
+							super().__init__(main)
+
+							# self.sliderMoved.connect(self.SliderMoved)
+
+							self.timer = QTimer()
+							self.timer.setInterval(100)
+							self.timer.timeout.connect(self.Timer)
+							self.timer.start()
+
+							self.sliderMoved.connect(self.SliderMoved)
+
+							self.setStyleSheet('''
+
+								QScrollBar:vertical
+								{
+									background-color: #252525;
+									border: 1px solid #454545;
+									width: 15px;
+									margin: 20px 0 20px 0;
+								}
+								QScrollBar::handle:vertical
+								{
+									background-color: #454545;
+									min-height:	10px;
+								}
+								QScrollBar::handle:vertical:hover
+								{
+									background-color: #ffd37f;
+									min-height: 10px;
+								}
+								QScrollBar::sub-line:vertical, QScrollBar::add-line:vertical
+								{
+									height: 18px;
+									subcontrol-origin: margin;
+									background-color: #000000; 
+									border: 1px solid #454545; 
+								}
+								QScrollBar::sub-line:vertical:hover, QScrollBar::sub-line:vertical:on, QScrollBar::add-line:vertical:hover, QScrollBar::add-line:vertical:on
+								{
+									height: 18px;
+									subcontrol-origin: margin;
+									background-color: #000000; 
+									border: 1px solid #ffd37f; 
+								}
+								QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical, QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical
+								{
+									background-color: none; 
+								}
+
+								''')
+
+							self.resize(5, self.height())
+
+						def enterEvent(self, event):
+							self.animE = QPropertyAnimation(self, b"geometry")
+							self.animE.setStartValue(QRect(main.width() - 5, 0, 5, main.height()))
+							self.animE.setEndValue(QRect(main.width() - 15, 0, 15, main.height()))
+							self.animE.setDuration(100)
+							self.animE.start()
+							#main.moveUpdate()
+
+						def leaveEvent(self, a):
+							self.animL = QPropertyAnimation(self, b"geometry")
+							self.animL.setEndValue(QRect(main.width() - 5, 0, 5, main.height()))
+							self.animL.setStartValue(QRect(main.width() - 15, 0, 15, main.height()))
+							self.animL.setDuration(100)
+							self.animL.start()
+							#main.moveUpdate()
+
+						def Timer(self):
+							main.AreaItems.move(0, -(self.value() - self.minimum()))
+							if self.minimum() < self.maximum():
+								self.show()
+							else:
+								self.hide()
+
+						def SliderMoved(self, position):
+							main.AreaItems.move(0, -(self.value() - self.minimum()))
+
+					self.scrollBar = ScrollBar()
+
+					self.qTimer = QTimer()
+					self.qTimer.setInterval(1000)
+					self.qTimer.timeout.connect(self.TimerUpdate)
+					self.qTimer.start()
+
+					#self.addItems()
+
+
+			self.treeWidget = TreeWidget()
+			self.treeWidget.move(0, 50)
+			self.treeWidget.show()
+			self.treeWidget.raise_()
+
+			self.tab = QWidget()
+			self.tab.move(0, 0)
+			self.tab.resize(300, 50)
+			self.tab.setParent(self)
+			self.tab.setStyleSheet("border-color:#454545; border-width: 3 px; border-style: solid;")
+
+
+			self.tabLayout = QGridLayout(self.tab)
+			self.tabLayout.setSpacing(0)
+
+			self.updateGraphicsTimer = QTimer()
+			self.updateGraphicsTimer.setInterval(1000)
+			self.updateGraphicsTimer.timeout.connect(self.updateGraphics)
+			self.updateGraphicsTimer.start()
+
+
+			class TabObject():
+				def __init__(self, _name="", _buttonPos = [0, 0], _treePath=None, _root=self.tabLayout):
+					self.root = _root
+					self.treePath = _treePath
+					self.Name = _name
+					self.tabButton = QPushButton()
+
+					self.tabButton.setFixedSize(70, 15)
+					self.tabButton.setStyleSheet(StyleSheetList[2])
+
+					self.tabButton.clicked.connect(lambda: self.clickedButton())
+
+					self.root.addWidget(self.tabButton, _buttonPos[0], _buttonPos[1])
+
+					self.StatUpdate()
+
+				def ChangePos(self, _buttonPos):
+					self.root.removeWidget(self.tabButton)
+					self.root.addWidget(self.tabButton, _buttonPos[0], _buttonPos[1])
+
+				def clickedButton(self):
+					if self.treePath==None:
+						SummonMessage("Нужно Создать ету папку!")
+					else:
+						RootWidget.selectedTab = self
+
+						if os.path.exists(self.treePath):
+							RootWidget.model.setRootPath(self.treePath)
+
+							RootWidget.tree.setModel(RootWidget.model)
+							RootWidget.tree.setRootIndex(RootWidget.model.index(self.treePath))
+
+							RootWidget.tree.setColumnWidth(0, 1000)
+
+							#RootWidget.tree.show()
+
+							root.treeWidget.clearItems()
+
+							for file in glob.glob(glob.escape(self.treePath)+"/**/*.json", recursive=True):
+								root.treeWidget.addItems(None, "Name", file)
+							for file in glob.glob(glob.escape(self.treePath)+"/**/*.hjson", recursive=True):
+								root.treeWidget.addItems(None, "Name", file)
+
+						else:
+							RootWidget.tree.hide()
+						EditRoot[1] = self.Name
+					for i in RootWidget.tabsObjects.keys():
+						RootWidget.tabsObjects[i].StatUpdate()
+				def StatUpdate(self):
+					if self.treePath==None:
+						self.tabButton.setText(str(self.Name)+" !")
+						self.tabButton.setStyleSheet("QPushButton { font-family: fontello; font-size: 10 px; background-color:#000000; border-style: solid; border-width: 1px; border-color: #454545; color: #f15352; } QPushButton:hover { border-color: #ffd37f; } QPushButton:disabled { border-color: #84f490; }")
+					else:
+						self.tabButton.setText(str(self.Name))
+						self.tabButton.setStyleSheet("QPushButton { font-family: fontello; font-size: 10 px; background-color:#000000; border-style: solid; border-width: 1px; border-color: #454545; color: #ffffff; } QPushButton:hover { border-color: #ffd37f; } QPushButton:disabled { border-color: #84f490; }")
+					self.tabButton.setDisabled(RootWidget.selectedTab == self)
+
+			self.tabsObjects = {}
+
+
+
+			iNum = [0, 0]
+			for i in ["Blocks", "Items", "Liquids", "Sectors", "Status", "Units", "Weathers"]:
+				if os.path.exists(RootMod[1] + "/content/" + i.lower()):
+					self.tabsObjects.update({i: TabObject(i, iNum, RootMod[1] + "/content/" + i.lower())})
 				else:
-					_type = _button.text()
-					_button.setDisabled(True)
-					_tempButtonContent.setDisabled(False)
-				_tempButtonContent = _button
+					self.tabsObjects.update({i: TabObject(i, iNum)})
 
-				if os.path.exists(RootMod[1] + "/content/" + _type.lower() + "/"):
-					self.model.setRootPath(RootMod[1] + "/content/" + _type.lower() + "/")
-
-					self.tree.setModel(self.model)
-					self.tree.setRootIndex(self.model.index(RootMod[1] + "/content/" + _type.lower() + "/"))
-
-					self.tree.setColumnWidth(0, 1000)
-			
-					self.tree.show()
+				print(iNum)
+				if iNum[1] >= 3:
+					iNum[1] = 0
+					iNum[0] += 1
+					if iNum[0] > 1:
+						iNum = [0, 0]
 				else:
-					self.tree.hide()
-
-				EditRoot[1] = _type
+					iNum[1] += 1
 
 
 
-			buttonTreeBlocks = QPushButton("Blocks")
-			buttonTreeBlocks.setFixedSize(75, 15)
-			buttonTreeBlocks.setStyleSheet(StyleSheetList[2])
-			buttonTreeBlocks.clicked.connect(lambda: ChooseTypeContent(buttonTreeBlocks))
-	
-			buttonTreeItems = QPushButton("Items")
-			buttonTreeItems.setFixedSize(75, 15)
-			buttonTreeItems.setStyleSheet(StyleSheetList[2])
-			buttonTreeItems.clicked.connect(lambda: ChooseTypeContent(buttonTreeItems))
-	
-			buttonTreeLiquids = QPushButton("Liquids")
-			buttonTreeLiquids.setFixedSize(75, 15)
-			buttonTreeLiquids.setStyleSheet(StyleSheetList[2])
-			buttonTreeLiquids.clicked.connect(lambda: ChooseTypeContent(buttonTreeLiquids))
-	
-			buttonTreeSectors = QPushButton("Sectors")
-			buttonTreeSectors.setFixedSize(75, 15)
-			buttonTreeSectors.setStyleSheet(StyleSheetList[2])
-			buttonTreeSectors.clicked.connect(lambda: ChooseTypeContent(buttonTreeSectors))
-	
-			buttonTreeStatus = QPushButton("Status")
-			buttonTreeStatus.setFixedSize(75, 15)
-			buttonTreeStatus.setStyleSheet(StyleSheetList[2])
-			buttonTreeStatus.clicked.connect(lambda: ChooseTypeContent(buttonTreeStatus))
-	
-			buttonTreeUnits = QPushButton("Units")
-			buttonTreeUnits.setFixedSize(75, 15)
-			buttonTreeUnits.setStyleSheet(StyleSheetList[2])
-			buttonTreeUnits.clicked.connect(lambda: ChooseTypeContent(buttonTreeUnits))
-	
-			buttonTreeWeathers = QPushButton("Weathers")
-			buttonTreeWeathers.setFixedSize(75, 30)
-			buttonTreeWeathers.setStyleSheet(StyleSheetList[2])
-			buttonTreeWeathers.clicked.connect(lambda: ChooseTypeContent(buttonTreeWeathers))
 
-	
-			self.layoutTreeWidget.addWidget(buttonTreeBlocks, 0, 0)
-			self.layoutTreeWidget.addWidget(buttonTreeItems, 1, 0)
-			self.layoutTreeWidget.addWidget(buttonTreeLiquids, 0, 1)
-			self.layoutTreeWidget.addWidget(buttonTreeSectors, 1, 1)
-			self.layoutTreeWidget.addWidget(buttonTreeStatus, 0, 2)
-			self.layoutTreeWidget.addWidget(buttonTreeUnits, 1, 2)
-			self.layoutTreeWidget.addWidget(buttonTreeWeathers, 0, 3, 2, 1)
+		def updateTabs(self):
+			for i in self.tabsObjects.keys():
+				#print(RootMod[1] + "/content/" + i.lower())
+				if os.path.exists(RootMod[1] + "/content/" + i.lower()):
+					self.tabsObjects[i].treePath = RootMod[1] + "/content/" + i.lower()
+					self.tabsObjects[i].StatUpdate()
+				else:
+					self.tabsObjects[i].treePath = None
+					self.tabsObjects[i].StatUpdate()
 
-			self.layoutTreeWidget.addWidget(self.tree, 2, 0, 3, 0)
+
+
+
 	WindowTree = windowTree()
 
+
+	class SettingsWindow(DrawWindow):
+		def __init__(self):
+			super(SettingsWindow, self).__init__(window)
+
+
+	#settingsWindow = SettingsWindow()
 	attachebleWidgets.append(customizationWindow.treeWidgetFrame)
 	attachebleWidgets.append(customizationWindow.editorWidgetFrame)
 	#attachebleWidgets.append(getOpenMode)
 	#attachebleWidgets.append(getCreateFile)
 
-	treeWidgetOpener = QPushButton(window)
-	treeWidgetOpener.move(300-30, 700-30)
-	treeWidgetOpener.resize(30, 30)
-	treeWidgetOpener.setText("")
-	treeWidgetOpener.setStyleSheet(StyleSheetList[0])
-	treeWidgetOpener.clicked.connect(lambda: WindowTree.attach(customizationWindow.treeWidgetFrame))
-	
-	editorWidgetOpener = QPushButton(window)
-	editorWidgetOpener.move(300-30-30, 700-30)
-	editorWidgetOpener.resize(30, 30)
-	editorWidgetOpener.setText("")
-	editorWidgetOpener.setStyleSheet(StyleSheetList[0])
-	editorWidgetOpener.clicked.connect(lambda: editorWindow.attach(customizationWindow.editorWidgetFrame))
+
 
 	def ImagOPT(img):
 		for t in range(0, len(SpriteL)):
@@ -1536,8 +2059,8 @@ def MainL():
 
 	class EditorWindow(DrawWindow):
 		def __init__(self):
-			super().__init__()
-			self.upPanel.setTitle("Редактор")
+			super().__init__(window, attachebleWidgets)
+			self.upPanel.setTitle(" Редактор")
 
 			#self.scroll = QScrollArea(self)
 
@@ -1554,75 +2077,6 @@ def MainL():
 	editorWindow.attach(customizationWindow.editorWidgetFrame)
 
 
-	'''EObj = {
-	 "type": [QLabel(editorWindow, text = "Type"), QComboBox(editorWindow)],
-	 "name": [QLabel(editorWindow, text = "Name"), QLineEdit(editorWindow)],
-	 "displayName": [QLabel(editorWindow, text = "DisplayName"), QLineEdit(editorWindow)], 
-	 "author": [QLabel(editorWindow, text = "Authors"), QLineEdit(editorWindow)], 
-	 "description": [QLabel(editorWindow, text = "Description"), QTextEdit(editorWindow)], 
-	 "version": [QLabel(editorWindow, text = "Version"), QLineEdit(editorWindow)], 
-	 "minGameVersion": [QLabel(editorWindow, text = "minVersion"), QLineEdit(editorWindow)], 
-	 "dependencies": [QLabel(editorWindow, text = "dependencies"), QLineEdit(editorWindow), list], 
-	 "hidden": [QLabel(editorWindow, text = "hidden"), QCheckBox(editorWindow)], 
-
-	 "health": [QLabel(editorWindow, text = "Health"), QLineEdit(editorWindow), float], 
-	 "size": [QLabel(editorWindow, text = "Size"), QLineEdit(editorWindow), float], 
-	 "speed": [QLabel(editorWindow, text = "Speed"), QLineEdit(editorWindow), float], 
-
-	 "hasPower": [QLabel(editorWindow, text = "hasPower"), QCheckBox(editorWindow)], 
-	 "hasItems": [QLabel(editorWindow, text = "hasItems"), QCheckBox(editorWindow)], 
-	 "hasLiquids": [QLabel(editorWindow, text = "hasLiquids"), QCheckBox(editorWindow)], 
-
-	 "craftTime": [QLabel(editorWindow, text = "craftTime"), QLineEdit(editorWindow), float], 
-	 "idleSoundVolume": [QLabel(editorWindow, text = "idleSoundVolume"), QLineEdit(editorWindow), float], 
-	 "itemCapacity": [QLabel(editorWindow, text = "itemCapacity"), QLineEdit(editorWindow), float], 
-
-	 "updateEffect": [QLabel(editorWindow, text = "updateEffect"), QLineEdit(editorWindow)], 
-
-	 "drillTime": [QLabel(editorWindow, text = "Drill Time"), QLineEdit(editorWindow), float], 
-	 "drillEffect": [QLabel(editorWindow, text = "Drill Effect"), QLineEdit(editorWindow)], 
-
-	 "tier": [QLabel(editorWindow, text = "Tier"), QLineEdit(editorWindow), float], 
-
-	 "heating": [QLabel(editorWindow, text = "Heating"), QLineEdit(editorWindow), float], 
-
-	 "powerProduction": [QLabel(editorWindow, text = "Power Production"), QLineEdit(editorWindow), float], 
-	 "itemDuration": [QLabel(editorWindow, text = "Item Duration"), QLineEdit(editorWindow), float], 
-
-
-
-	 "requirements": [QLabel(editorWindow, text = "Requirements"), QLineEdit(editorWindow)], 
-	 "consumes": [QLabel(editorWindow, text = "Consumes"), QLineEdit(editorWindow)], 
-	 "outputItem": [QLabel(editorWindow, text = "Output Item"), QLineEdit(editorWindow)], 
-	 "outputLiquid": [QLabel(editorWindow, text = "Output Liquid"), QLineEdit(editorWindow)], 
-
-	 "category": [QLabel(editorWindow, text = "Category"), QLineEdit(editorWindow)], 
-	 "research": [QLabel(editorWindow, text = "Research"), QLineEdit(editorWindow)], 
-	 "alwaysUnlocked": [QLabel(editorWindow, text = "Always Unlocked"), QCheckBox(editorWindow)], 
-
-	 "color": [QLabel(editorWindow, text = "Color"), QLineEdit(editorWindow)], 
-	 "explosiveness": [QLabel(editorWindow, text = "Explosiveness"), QLineEdit(editorWindow), float], 
-	 "fliammbility": [QLabel(editorWindow, text = "Fliammbility"), QLineEdit(editorWindow), float], 
-	 "radioactivity": [QLabel(editorWindow, text = "Radioactivity"), QLineEdit(editorWindow), float], 
-	 "hardness": [QLabel(editorWindow, text = "Hardness"), QLineEdit(editorWindow), float], 
-	 "cost": [QLabel(editorWindow, text = "Cost"), QLineEdit(editorWindow), float], 
-
-	 "healthScaling": [QLabel(editorWindow, text = "Health Scaling"), QLineEdit(editorWindow), float], 
-	 "lowPriority": [QLabel(editorWindow, text = "Low Priority"), QLineEdit(editorWindow), float], 
-	 "frames": [QLabel(editorWindow, text = "Frames"), QLineEdit(editorWindow), float], 
-	 "transitionFrames": [QLabel(window, text = "Transition Frames"), QLineEdit(editorWindow), float], 
-	 "frameTime": [QLabel(editorWindow, text = "Frame Time"), QLineEdit(editorWindow), float], 
-	 "buildable": [QLabel(editorWindow, text = "Buildable"), QLineEdit(editorWindow), float], 
-
-
-
-
-
-	 "viscosity": [QLabel(editorWindow, text = "Viscosity"), QLineEdit(editorWindow), float], 
-	 "heatCapacity": [QLabel(editorWindow, text = "Heat Capacity"), QLineEdit(editorWindow), float], 
-	 "effect": [QLabel(editorWindow, text = "Effect"), QLineEdit(editorWindow)], 
-	 "lightColor": [QLabel(editorWindow, text = "Light Color"), QLineEdit(editorWindow)], 
-	}'''
 
 	def GetContentObjectData():
 		global ContentObject, DefaultFileSave
@@ -1631,36 +2085,70 @@ def MainL():
 			if ContentObject["Type"][0] != None:
 				print(ContentObject["Type"])
 				if ContentObject["Mod"] != {}:
-					if ContentObject["Type"][1] in DefaultFileSave[ContentObject["Type"][0]]:
-						ModSaveTemp = DefaultFileSave[ContentObject["Type"][0]][ContentObject["Type"][1]]
-					elif ContentObject["Type"][0] == "mod":
-						ModSaveTemp = DefaultFileSave["mod"]
-					elif ContentObject["Type"][0] in DefaultFileSave[ContentObject["Type"][0]]:
-						ModSaveTemp = DefaultFileSave[ContentObject["Type"][0]][ContentObject["Type"][0]]
-					
+
+					if ContentObject["Type"][0] == "mod":
+						ModSaveTemp = classType["mod"]
+					else:
+						_podType = ContentObject["Type"][1]
+						for t in classType.keys():
+							if t.lower() == _podType.lower():
+								_podType = t
+
+						_mod = reverseDict(classType[_podType])
+						_mod1 = {}
+						_tt = True
+						if "extend" in _mod:
+							_mod1 = reverseDict(classType[_mod["extend"]])
+							_mod.update(_mod1)
+
+						while _tt:
+							if "extend" in _mod1:
+								if _mod1["extend"] in classType:
+									print(_mod1["extend"])
+									_mod1 = reverseDict(classType[_mod1["extend"]])
+									_mod.update(_mod1)
+
+							else:
+								_tt = False
+
+						if "extend" in _mod:
+							del _mod["extend"]
+
+						#print(_mod["type"])
+						#_mod.update({"type": _podType})
+
+						ModSaveTemp = _mod
+
 					print("= ", ModSaveTemp, " =")
+					#SummonMessage(ContentObject["visualWidget"])
 					ModSaveTemp_temp = ModSaveTemp
 					for i in ModSaveTemp.keys():
 						try:
-							if type(EObj[i][1]) is QTextEdit:
-								if len(EObj[i][1].toPlainText()) > 0:
-									ModSaveTemp[i] = EObj[i][1].toPlainText()
+							#print(ContentObject["visualWidget"][i])
+							if type(ContentObject["visualWidget"][i][1]) is QTextEdit:
+								if len(ContentObject["visualWidget"][i][1].toPlainText()) > 0:
+									ModSaveTemp[i] = ContentObject["visualWidget"][i][1].toPlainText()
 								else:
 									ModSaveTemp[i] = None
-							if type(EObj[i][1]) is QLineEdit:
-								if len(EObj[i][1].text()) > 0:
-									ModSaveTemp[i] = EObj[i][1].text()
+							if type(ContentObject["visualWidget"][i][1]) is QLineEdit:
+								if len(ContentObject["visualWidget"][i][1].text()) > 0:
+									ModSaveTemp[i] = ContentObject["visualWidget"][i][1].text()
 								else:
 									ModSaveTemp[i] = None
-							if type(EObj[i][1]) is QComboBox:
-								if len(EObj[i][1].currentText()) > 0:
-									ModSaveTemp[i] = EObj[i][1].currentText()
+							if type(ContentObject["visualWidget"][i][1]) is QComboBox:
+								if len(ContentObject["visualWidget"][i][1].currentText()) > 0:
+									ModSaveTemp[i] = ContentObject["visualWidget"][i][1].currentText()
 								else:
 									ModSaveTemp[i] = None
-							if type(EObj[i][1]) is QCheckBox:
-								ModSaveTemp[i] = EObj[i][1].isChecked()
+							if type(ContentObject["visualWidget"][i][1]) is QCheckBox:
+								ModSaveTemp[i] = ContentObject["visualWidget"][i][1].isChecked()
+							if type(ContentObject["visualWidget"][i][1]) is GUIrequirements:
+								ModSaveTemp[i] = ContentObject["visualWidget"][i][1].exportResText()
+							if type(ContentObject["visualWidget"][i][1]) is GUIcategory:
+								ModSaveTemp[i] = ContentObject["visualWidget"][i][1].chosed
+								#print(ContentObject["visualWidget"][i][1].exportResText())
 							if list is type(ModSaveTemp_temp[i]):
-									
+
 								_tempCon = ""
 
 								for o in ModSaveTemp[i]:
@@ -1677,14 +2165,14 @@ def MainL():
 							if int is type(ModSaveTemp_temp[i]):
 								ModSaveTemp[i] = int(ModSaveTemp[i])
 
-								
+
 						except Exception as x:
-							print(type(EObj[i][1]))
+							print(type(ContentObject["visualWidget"][i][1]))
 							print(x)
 							SummonMessage(x, "error")
 
 						print("HI")
-							
+					ModSaveTemp.update({"type": _podType})
 					return ModSaveTemp
 		except Exception as x:
 			SummonMessage(x, "error")
@@ -1696,12 +2184,42 @@ def MainL():
 			if EditRoot[0] == 0:
 				if ContentObject["Mod"] != {}:
 					ModSaveTemp = GetContentObjectData()
-					print(ModSaveTemp)
 					if ModSaveTemp != None:
 						_tttemp = ContentObject["Path"]
+
+						_podType = ContentObject["Type"][1]
+
+						for t in classType.keys():
+							if t.lower() == _podType.lower():
+								_podType = t
+
+						_mod = reverseDict(classType[_podType])
+						_mod1 = {}
+						_tt = True
+						if "extend" in _mod:
+							_mod1 = reverseDict(classType[_mod["extend"]])
+							_mod.update(_mod1)
+
+						while _tt:
+							if "extend" in _mod1:
+								if _mod1["extend"] in classType:
+									print(_mod1["extend"])
+									_mod1 = reverseDict(classType[_mod1["extend"]])
+									_mod.update(_mod1)
+
+							else:
+								_tt = False
+
+						if "extend" in _mod:
+							del _mod["extend"]
+
+						for t in _mod.keys():
+							if ModSaveTemp[t]==_mod[t]:
+								del ModSaveTemp[t]
+
 						if getSuffixPath(_tttemp) == "json":
 							with open(_tttemp, "w") as _tempSave:
-								json.dump(ModSaveTemp, _tempSave)
+								json.dump(ModSaveTemp, _tempSave, indent=2)
 						if getSuffixPath(_tttemp) == "hjson":
 							os.rename(_tttemp, _tttemp[:-5] + "json")
 							_tttemp = _tttemp[:-5] + "json"
@@ -1711,7 +2229,7 @@ def MainL():
 
 							SummonMessage("Для Лутшой Работи Програми\nВсе данние переконвертировани под Json")
 							with open(_tttemp, "w") as _tempSave:
-								json.dump(ModSaveTemp, _tempSave)
+								json.dump(ModSaveTemp, _tempSave, indent=2)
 				_read = openFiler(ContentObject["Path"])
 				print("HEAR")
 				print(_read)
@@ -1724,10 +2242,10 @@ def MainL():
 				_tttemp = ContentObject["Path"]
 				if getSuffixPath(_tttemp) == "json":
 					with open(_tttemp, "w") as _tempSave:
-						json.dump(ModSaveTemp, _tempSave)
+						json.dump(ModSaveTemp, _tempSave, indent=2)
 				if getSuffixPath(_tttemp) == "hjson":
 					with open(_tttemp, "w") as _tempSave:
-						hjson.dump(ModSaveTemp, _tempSave)
+						hjson.dump(ModSaveTemp, _tempSave, indent=2)
 				_read = openFiler(ContentObject["Path"])
 				ContentObject["Mod"] = _read[0]
 				ContentObject["Text"] = _read[1]
@@ -1802,11 +2320,15 @@ def MainL():
 					ContentObject["visualWidget"][par][1].clear()
 					ContentObject["visualWidget"][par][1].addItem(str(Text))
 					ContentObject["visualWidget"][par][1].setCurrentIndex(0)
+				elif type(ContentObject["visualWidget"][par][1]) is GUIrequirements:
+					ContentObject["visualWidget"][par][1].importResText(str(Text))
+				elif type(ContentObject["visualWidget"][par][1]) is GUIcategory:
+					ContentObject["visualWidget"][par][1].chose(str(Text).lower())
 				elif type(ContentObject["visualWidget"][par][1]) is QCheckBox:
 					ContentObject["visualWidget"][par][1].setChecked(bool(Text))
 				else:
 					if type(_text) is collections.OrderedDict:
-						ContentObject["visualWidget"][par][1].setText(str(json.loads(json.dumps(Text))))
+						ContentObject["visualWidget"][par][1].setText(str(json.loads(json.dumps(Text, indent=2))))
 					else:
 						ContentObject["visualWidget"][par][1].setText(str(Text))
 					ContentObject["visualWidget"][par][1].setStyleSheet("color: #ffffff; border-style: solid; border-width: 3 px; border-color: #00000000; border-bottom-color: #454545; padding: -15 px;")
@@ -1830,6 +2352,7 @@ def MainL():
 	ModeEditText.move(305, 75)
 	ModeEditText.resize(490, 590)
 	ModeEditText.setStyleSheet("color: #ffffff")
+	ModeEditText.setFont("Arial")
 	ModeEditText.hide()
 
 
@@ -1924,8 +2447,11 @@ def MainL():
 		
 
 		for d in ContentObject["visualWidget"].keys():
-			ContentObject["visualWidget"][d][0].deleteLater()
-			ContentObject["visualWidget"][d][1].deleteLater()
+			try:
+				ContentObject["visualWidget"][d][0].deleteLater()
+				ContentObject["visualWidget"][d][1].deleteLater()
+			except:
+				pass
 			#print(ContentObject["visualWidget"])
 		ContentObject = {"Mod": {}, "Path": None, "Type": ["", ""], "Text": "", "visualWidget": {}}
 		
@@ -1949,23 +2475,19 @@ def MainL():
 	def OpenMod(_mode = 0):
 		global RootMod, TempZipPath
 
+
 		TempZipPath = ""
 
 
-		getOpenMode.upPanel.closeWindow()
 
-		ModCloseButton.hide()
-		ModSaveButton.hide()
-		ModChoseButton.show()
-		ModNewButton.show()
-			
+
 		try:
 
 			sucsFold = False
 			while sucsFold == False:
 				if _mode == 0:
 					Mod1 = QFileDialog.getExistingDirectory(window, "Выберете папку с модом", os.path.expanduser('~') + "\\AppData\\Roaming\\Mindustry\\mods\\")
-
+					RootMod[2] = "Folder"
 				else:
 					try:
 						shutil.rmtree("ZipTemp")
@@ -1976,17 +2498,15 @@ def MainL():
 	
 					TempZipPath = Mod1[0]
 				
-					
-					ModSaveButton.show()
-					ModChoseButton.hide()
+
 					
 				
 					shutil.unpack_archive(Mod1[0], "ZipTemp", "zip")
 
 					Mod1 = "ZipTemp"
+					RootMod[2] = "Zip"
 					print(Mod1)
-				ModNewButton.hide()
-				ModCloseButton.show()
+
 
 				Mod = os.listdir(Mod1)
 				print(Mod)
@@ -2022,10 +2542,25 @@ def MainL():
 
 	def InitializationMod():
 		global RootMod, ContentL, ContentL1, SpriteL, ContentObject
-		
+
+
 		print(RootMod[1])
 		print(RootMod[0])
-		
+		getOpenMode.upPanel.closeWindow()
+
+		getOpenModeMindustry.hide()
+
+		ModCloseButton.hide()
+		ModSaveButton.hide()
+		ModChoseButton.hide()
+		ModNewButton.hide()
+
+		if RootMod[2] == "Folder":
+			ModChoseButton.show()
+			ModCloseButton.show()
+		elif RootMod[2] == "Zip":
+			ModSaveButton.show()
+			ModCloseButton.show()
 		try:
 			if RootMod[0] == None:
 				msgBox = QMessageBox(window)
@@ -2091,7 +2626,9 @@ def MainL():
 			IconMod.setPixmap(QPixmap().fromImage(ImageQt(Logo).copy()))
 
 			WindowTree.tree.hide()
-		
+
+			WindowTree.updateTabs()
+
 			CloseContentObject()
 
 			SummonMessage("Мод был Открыт!")
@@ -2124,29 +2661,111 @@ def MainL():
 	'''Функция Перезаписи Размера'''
 	'''Функция Перезаписи Размера'''
 	'''Функция Перезаписи Размера'''
-	
-	
 
-	def ResizeWindow():
-		try:
-			#tree.setGeometry(0, 75, 300, window.height() - (75 + 30))
-			CreateObj.setGeometry(0, window.height() - 30, 75, 30)
-			ModeEditButton.setGeometry(int((window.width() - 300)/2 + 300 -100), window.height() - 30, 200, 30)
+	class InfoWindow(DrawWindow):
+		def __init__(self):
+			super(InfoWindow, self).__init__(window)
+			self.resize(250, 250)
+			self.upPanel.setTitle(" Информация")
+			self.setResizeble(False)
+			#self.moveUpdate()
+			self.devVersionLabeltext = QLabel(self)
+			self.devVersionLabeltext.setGeometry(5, 5, 250-10, 30)
+			self.devVersionLabeltext.setFont(QFont(families[0], 15))
+			self.devVersionLabeltext.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+			self.devVersionLabeltext.setStyleSheet("color: #ffffff")
+			self.devVersionLabeltext.setText("Версия:")
 
-			ModContentFrame.setGeometry(0, 75, 300, window.height() - (75 + 30))
 
-			#GlobalFrameGridFrame.setGeometry(0, 75, window.width(), window.height() - (75 + 30))
-			Frame_Content.resize(window.width() - 300, 75)
+			self.devVersionLabel = QLabel(self)
+			self.devVersionLabel.setText(programInfo["verName"] + " " + str(programInfo["ver"]))
+			self.devVersionLabel.setStyleSheet("color: " + MindustryColors["teams"]["yellow"])
+			self.devVersionLabel.setFont(QFont(families[0], 14))
+			self.devVersionLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+			self.devVersionLabel.setGeometry(5, 30, 250-10, 30)
 
-			treeWidgetOpener.move(300-30, window.height()-30)
-			editorWidgetOpener.move(300-60, window.height()-30)
 
-			Name_Content.resize(window.width() - 377, 20)
-			Desc_Content.resize(window.width() - 377, 40)
-			SaveObj.move(window.width() - (int(75/2) + 15) - 40, int(75/2) - 15)
-			CloseObj.move(window.width() - (int(75/2) + 15), int(75/2) - 15)
-		except Exception as x:
-			SummonMessage(x, "error")
+			self.authorLabel = QLabel(self)
+			self.authorLabel.setGeometry(5, 65, 250-10, 30)
+			self.authorLabel.setFont(QFont(families[0], 15))
+			self.authorLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+			self.authorLabel.setStyleSheet("color: #ffffff")
+			self.authorLabel.setText(coloritaText("["+MindustryColors["teams"]["yellow"]+"]Создатель: [green]DL"))
+
+			self.buttonAtuthorHyperLink = QPushButton(self)
+			self.buttonAtuthorHyperLink.setGeometry(5, 65, 250-10, 30)
+			self.buttonAtuthorHyperLink.pressed.connect(lambda: QDesktopServices.openUrl("https://github.com/DL-03"))
+			self.buttonAtuthorHyperLink.setFont(QFont(families[0], 15))
+			self.buttonAtuthorHyperLink.setText("Перейти по силке!")
+			self.buttonAtuthorHyperLink.setStyleSheet("QPushButton { font-family: fontello; font-size: 10 px; background-color:none; border-style: solid; border-width: 3px; border-color: #454545; color: #00000000; } QPushButton:hover {border-color: #0000ff; color: rgb(0, 0, 255, 125); background-color:rgb(0, 0, 0, 125)}")
+
+			self.passwordText = QLabel(self)
+			self.passwordText.setText("Пароль: ")
+			self.passwordText.setGeometry(5, 100, 250 - 10, 30)
+			self.passwordText.setFont(QFont(families[0], 15))
+			self.passwordText.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+			self.passwordText.setStyleSheet("color: #ffffff")
+
+			self.passwordLine = QLineEdit(self)
+			self.passwordLine.setGeometry(5, 135, 250 - 10, 30)
+			self.passwordLine.setText("Пароль")
+			self.passwordLine.setStyleSheet(
+				"color: #ffffff; border-style: solid; border-width: 3 px; border-color: #00000000; border-bottom-color: #454545;")
+			self.passwordLine.setFont(QFont(families[0], 12))
+
+			def password():
+				if self.passwordLine.text() == "0.21" or self.passwordLine.text() == "v0.21":
+					SummonMessage("Доступ к недоделанными функциям получен!")
+					self.passwordText.deleteLater()
+					self.passwordLine.deleteLater()
+					self.passwordButton.deleteLater()
+
+					readyBuild = False
+
+					window.downPanel.settingsButton.setDisabled(readyBuild)
+					window.downPanel.CreateObj.setDisabled(readyBuild)
+					ModNewButton.setDisabled(readyBuild)
+					getOpenMode.window.button2.setDisabled(readyBuild)
+					getOpenMode.window.button2.setThem("default", {"border-color": "#454545", "border-color-hover": MindustryColors["teams"]["yellow"], "color": "#ffffff"})
+					getOpenMode.window.button2.setText("Mindustry")
+
+				else:
+					if self.passwordLine.text() == "1234":
+						SummonMessage("Слишком банально")
+					elif self.passwordLine.text() == "117":
+						SummonMessage("Я вроде не Влад ну ладно -_-")
+					elif self.passwordLine.text() == "DL":
+						SummonMessage("Это моє имя!")
+					elif self.passwordLine.text() == "Exmii":
+						SummonMessage("Почему в твоєм моде нет названий у обєктов почему???")
+					elif self.passwordLine.text() == "Пароль":
+						SummonMessage("Видимо ты не понимаешь своих намерений")
+					else:
+						SummonMessage("А на что ты вообще надеялся?")
+
+			self.passwordButton = QPushButton(self)
+			self.passwordButton.setGeometry(5, 175, 250 - 10, 30)
+			self.passwordButton.setText("Проверить Пароль")
+			self.passwordButton.setStyleSheet(StyleSheetList[0])
+			self.passwordButton.setFont(QFont(families[0], 12))
+			self.passwordButton.pressed.connect(password)
+
+
+			self.upPanel.closeWindow()
+			self.upPanel.openWindow()
+			#self.resize(250, 250)
+
+
+
+	infoWindow = InfoWindow()
+
+	devVersionLabel = QLabel(window)
+	devVersionLabel.setText(programInfo["verName"] + " " + str(programInfo["ver"]))
+	devVersionLabel.setStyleSheet("color: " + MindustryColors["teams"]["yellow"]+"; border: 3px solid #454545")
+	devVersionLabel.setFont(QFont(families[0], 14))
+
+
+
 
 	def MessageDeleteInfo(i):
 		print(i)
@@ -2186,10 +2805,6 @@ def MainL():
 			#print(x)
 
 
-	window.qTimer = QTimer()
-	window.qTimer.setInterval(100)
-	window.qTimer.timeout.connect(ResizeWindow)
-	window.qTimer.start()
 
 	window.q1Timer = QTimer()
 	window.q1Timer.setInterval(10)
@@ -2197,7 +2812,6 @@ def MainL():
 	window.q1Timer.start()
 
 
-	ResizeWindow()
 	#window.resized.connect(ResizeWindow)
 
 
@@ -2207,14 +2821,14 @@ def MainL():
 
 
 	def EditModChose():
-		global EditRoot, ContentObject
-		_temp = ContentObject
-		CloseContentObject()
-		ContentObject = _temp
+			global EditRoot, ContentObject
+			_temp = ContentObject
+			CloseContentObject()
+			ContentObject = _temp
 
-		try:
+		#try:
 
-			ContentObject["Mod"] = openFiler(ContentObject["Path"])
+			ContentObject["Mod"] = openFiler(ContentObject["Path"])[0]
 			OpenPreContentObject()
 
 			if EditRoot[0] == 0:
@@ -2226,11 +2840,12 @@ def MainL():
 				OpenContentObjectText()
 			else:
 				EditRoot[0] = 0
+
 				ModeEditButton.setText("Режим Редактирования\nГрафический")
 
 				OpenContentObjectGUI()
-		except Exception as x:
-			SummonMessage(x, "error")
+		#except Exception as x:
+			#SummonMessage(str(x)+"!!!!!!!!!!!!!", "error")
 
 
 	ModeEditButton.clicked.connect(EditModChose)
@@ -2253,6 +2868,357 @@ def MainL():
 			_dict2.update({dic: _dict[dic]})
 		return _dict2
 
+
+	testRequirements = []
+	testRequirementsWidgets = []
+	class GUIrequirements(QFrame):
+		def __init__(self):
+			super(GUIrequirements, self).__init__(editorWindow.window)
+
+			self.setStyleSheet("background-color: #000000")
+
+			#self.ItemsArea = QScrollArea(self)
+			#self.ItemsArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+
+			self.Items = QWidget(self)
+			self.Items.setStyleSheet("background-color:#00000000")
+			#self.Items.setWid
+
+			self.Items.resize(10, 60)
+
+			self.ItemsContainer = []
+			#self.ItemsArea.setWidgetResizable(True)
+			#self.ItemsArea.setWidget(self.Items)
+
+			self.Ttimer = QTimer()
+			self.Ttimer.setInterval(100)
+			self.Ttimer.timeout.connect(self.timerUpdate)
+			self.Ttimer.start()
+
+			self.addButton = QPushButton(self)
+			self.addButton.setGeometry(0, 0, 25, 60)
+			self.addButton.setStyleSheet("background-color: #888888")
+			self.addButton.setText("")
+			self.addButton.setFont(QFont(families[0], 12))
+			self.addButton.setStyleSheet(StyleSheetList[0])
+			self.addButton.clicked.connect(lambda: self.addRes())
+
+			main = self
+
+
+
+			class ScrollBar(QScrollBar):
+				def __init__(self):
+					super().__init__(main)
+
+					# self.sliderMoved.connect(self.SliderMoved)
+
+
+					self.timer = QTimer()
+					self.timer.setInterval(100)
+					self.timer.timeout.connect(self.Timer)
+					self.timer.start()
+
+					self.setOrientation(Qt.Horizontal)
+					self.setMinimum(30)
+					self.setPageStep(1)
+
+					self.sliderMoved.connect(self.SliderMoved)
+
+					self.setStyleSheet('''
+
+						QScrollBar:horizontal
+						{
+							background-color: #252525;
+							border: 1px solid #454545;
+							width: 15px;
+							margin: 0 20px 0 20px;
+						}
+						QScrollBar::handle:horizontal
+						{
+							background-color: #454545;
+							min-width: 10px;
+						}
+						QScrollBar::handle:horizontal:hover
+						{
+							background-color: #ffd37f;
+							min-width: 10px;
+						}
+						QScrollBar::sub-line:horizontal, QScrollBar::add-line:horizontal
+						{
+							width: 18px;
+							subcontrol-origin: margin;
+							background-color: #000000; 
+							border: 1px solid #454545; 
+						}
+						QScrollBar::sub-line:horizontal:hover, QScrollBar::sub-line:horizontal:on, QScrollBar::add-line:horizontal:hover, QScrollBar::add-line:horizontal:on
+						{
+							width: 18px;
+							subcontrol-origin: margin;
+							background-color: #000000; 
+							border: 1px solid #ffd37f; 
+						}
+						QScrollBar::up-arrow:horizontal, QScrollBar::down-arrow:horizontal, QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal
+						{
+							background-color: none; 
+						}
+
+						''')
+
+					#self.resize(self.width()-30, 10)
+
+
+
+				def Timer(self):
+					main.Items.move(-(self.value() - self.minimum())+30, 0)
+					#main.graphicsUpdate()
+					if self.minimum() < self.maximum():
+						self.show()
+					else:
+						self.hide()
+
+				def SliderMoved(self, position):
+					#main.graphicsUpdate()
+					main.Items.move(-(self.value() - self.minimum())+30, 0)
+
+			self.scrollBar = ScrollBar()
+
+		def importResText(self, text):
+			if text == "" or text == " ":
+				pass
+			else:
+				_tempCon = text
+
+				for o in text:
+					if o == "'":
+						_tempCon += '"'
+					else:
+						_tempCon += o
+
+				data = None
+
+				try:
+					data = json.loads(_tempCon)
+				except Exception:
+					try:
+						data = hjson.loads(_tempCon)
+					except Exception:
+						try:
+							data = json.loads(text)
+						except Exception:
+							try:
+								data = hjson.loads(text)
+							except:
+								pass
+				if data == {}:
+					try:
+						data = hjson.loads(_tempCon)
+					except Exception:
+						try:
+							data = json.loads(_tempCon)
+						except:
+							pass
+				if type(data) is list:
+					for d in data:
+						__name = ""
+						__value = ""
+						_j = 0
+						for t in d:
+							if t != "/" and _j==0:
+								__name += t
+							else:
+								if t != "/" and _j==1:
+									__value += t
+								_j=1
+						self.addRes(__name, __value)
+				elif type(data) is dict:
+					for d in data.keys():
+						self.addRes(d, data[d])
+
+		def exportResText(self):
+			result = {}
+			for e in self.ItemsContainer:
+				result.update({e[1][0][1].text():e[1][1][1].text()})
+			return str(json.dumps(result))
+		def addRes(self, _name="copper", _value=1):
+			#testRequirements.append([_name, _value])
+			self.ItemsContainer.append([QFrame(), [[QLabel(), QLineEdit()], [QLabel(), QLineEdit()]], [QPushButton()]])
+
+			_tp = self.ItemsContainer[-1][0]
+			_tp.setParent(self.Items)
+
+
+			self.ItemsContainer[-1][1][0][0].setParent(_tp)
+			self.ItemsContainer[-1][1][0][1].setParent(_tp)
+			self.ItemsContainer[-1][1][1][0].setParent(_tp)
+			self.ItemsContainer[-1][1][1][1].setParent(_tp)
+			self.ItemsContainer[-1][2][0].setParent(_tp)
+
+
+
+			#_tp.setGeometry(30, 0, 150, 50)
+			_tp.setStyleSheet("background-color: #252525; border-style: solid; border-width: 2; border-color: #454545")
+			#_tp.setFrameStyle((QFrame.Panel | QFrame.Raised))
+
+
+
+			self.ItemsContainer[-1][1][0][0].setGeometry(3, 2, 50, 25)
+			self.ItemsContainer[-1][1][0][1].setGeometry(50, 2, 75-2, 25-2)
+
+			self.ItemsContainer[-1][1][1][0].setGeometry(3, 25, 75, 25)
+			self.ItemsContainer[-1][1][1][1].setGeometry(75, 25, 50-2, 25)
+
+			self.ItemsContainer[-1][2][0].setGeometry(125, 3, 25-3, 50-6)
+
+
+			self.ItemsContainer[-1][1][0][0].setText("Ресурс: ")
+			self.ItemsContainer[-1][1][1][0].setText("Количество: ")
+
+
+			self.ItemsContainer[-1][1][1][1].setValidator(QIntValidator())
+
+			self.ItemsContainer[-1][1][0][1].setText(_name)
+			self.ItemsContainer[-1][1][1][1].setText(str(_value))
+
+
+
+			def remove():
+				for r in self.ItemsContainer:
+					if r[2][0] == _b:
+						r[1][0][0].deleteLater()
+						r[1][0][1].deleteLater()
+						r[1][1][0].deleteLater()
+						r[1][1][1].deleteLater()
+						r[2][0].deleteLater()
+						r[0].deleteLater()
+						self.ItemsContainer.remove(r)
+						self.graphicsUpdate()
+						break
+			_b = self.ItemsContainer[-1][2][0]
+			self.ItemsContainer[-1][2][0].clicked.connect(remove)
+			self.ItemsContainer[-1][2][0].setText("")
+
+			self.ItemsContainer[-1][2][0].setStyleSheet(StyleSheetList[0])
+			self.ItemsContainer[-1][1][0][0].setStyleSheet("color: #ffffff; border-width: 0 px; background-color: #00000000;")
+			self.ItemsContainer[-1][1][1][0].setStyleSheet("color: #ffffff; border-width: 0 px; background-color: #00000000;")
+			self.ItemsContainer[-1][1][0][1].setStyleSheet("color: #ffffff; border-style: solid; border-width: 3 px; border-color: #00000000; border-bottom-color: #454545; padding: -15 px;")
+			self.ItemsContainer[-1][1][1][1].setStyleSheet("color: #ffffff; border-style: solid; border-width: 3 px; border-color: #00000000; border-bottom-color: #454545; padding: -15 px;")
+
+			_tp.show()
+
+			self.graphicsUpdate()
+
+			self.timerUpdate()
+
+			self.scrollBar.setValue(self.scrollBar.maximum())
+		def timerUpdate(self):
+			self.Items.adjustSize()
+
+			#self.setGeometry(50, 0, window.width()-350, 60)
+			self.scrollBar.setGeometry(QRect(30, self.height() - 10, self.width() - 30, 10))
+
+			self.scrollBar.setMaximum(self.Items.width()+30)
+			self.scrollBar.setMinimum(self.width())
+		def deleteLater(self):
+			for i in self.ItemsContainer:
+				i[1][0][0].deleteLater()
+				i[1][0][1].deleteLater()
+				i[1][1][0].deleteLater()
+				i[1][1][1].deleteLater()
+				i[2][0].deleteLater()
+			super(GUIrequirements, self).deleteLater()
+		def graphicsUpdate(self):
+			self.setStyleSheet("background-color: #000000")
+			iNum = 0
+			for i in self.ItemsContainer:
+				i[0].move((iNum*155), 0)
+				#i[0].move((iNum*155), 0)
+				iNum += 1
+			#self.scrollBar.setMaximum((iNum*155))
+
+
+	#testGUIrequirements = GUIrequirements()
+	#testGUIrequirements.importResText("['lead-plate/6', 'copper-plate/6', 'stone-plate/6', 'plank-plate/6', 'lead/25', 'copper/50', 'stone/150', 'plank/25']")
+
+	class GUIcategory(QFrame):
+		def __init__(self):
+			super(GUIcategory, self).__init__(editorWindow.window)
+
+			self.resize(25*5, 50)
+			self.setMaximumWidth(25*5)
+			self.setStyleSheet("background-color: #000000")
+
+			self.chosed = ""
+
+			self.buttons = []
+
+			main = self
+
+			class makeButton(QPushButton):
+				def __init__(self, i, _x, _y):
+					super(makeButton, self).__init__(main)
+					main.buttons.append(self)
+					main.buttons[-1].setGeometry(_x * 25, _y * 25, 25, 25)
+					main.buttons[-1].setText(i[1])
+					main.buttons[-1].setFont(QFont(families[0], 12))
+					main.buttons[-1].setStyleSheet(StyleSheetList[2])
+					main.buttons[-1].Name = i[0]
+					main.buttons[-1].setToolTip(i[0])
+
+					main.buttons[-1].clicked.connect(lambda: main.chose(i[0]))
+
+				def enterEvent(self, event: QtGui.QEnterEvent):
+					super(makeButton, self).enterEvent(event)
+					main.Tip.move(main.x() + main.width() + 5, main.y() + (main.height() / 2) - (main.Tip.height() / 2))
+					main.Tip.Icon.setText(self.text())
+					main.Tip.Text.setText(str(self.Name)[0].upper()+str(self.Name)[1:])
+					main.Tip.show()
+
+				def leaveEvent(self, event: QtCore.QEvent):
+					super(makeButton, self).leaveEvent(event)
+					main.Tip.hide()
+
+			_x = 0
+			_y = 1
+			for i in [["turret", ""],["production", ""],["distribution", ""],["liquid", ""],["power", ""],["defense", ""],["crafting", ""],["units", ""],["effect", ""],["logic", ""]]:
+				makeButton(i, _x, _y)
+				_y -= 1
+				if _y < 0:
+					_x += 1
+					_y = 1
+			self.show()
+
+			self.Tip = QFrame(editorWindow.window)
+			self.Tip.setStyleSheet("background-color: #000000")
+			#self.Tip.hide()
+			self.Tip.resize(125, 30)
+
+			self.Tip.Icon = QPushButton(self.Tip)
+			self.Tip.Icon.setGeometry(0, 0, 30, 30)
+			self.Tip.Icon.setStyleSheet(StyleSheetList[2])
+			self.Tip.Icon.setFont(QFont(families[0], 12))
+			self.Tip.Icon.setDisabled(True)
+
+			self.Tip.Text = QLabel(self.Tip)
+			self.Tip.Text.setGeometry(35, 0, 125-35, 30)
+			self.Tip.Text.setStyleSheet("color: #ffffff")
+			self.Tip.Text.setFont(QFont(families[0], 10))
+
+			self.Tip.hide()
+
+
+		def chose(self, text=""):
+			self.chosed = text
+			for i in self.buttons:
+				print(self.chosed)
+				if i.Name == self.chosed:
+					i.setDisabled(True)
+				else:
+					i.setDisabled(False)
+
+
+	#testGUIcategory = GUIcategory()
+
 	def OpenContentObjectGUI():
 		global classType
 		ModeEditButton.show()
@@ -2264,8 +3230,8 @@ def MainL():
 		print(RootType)
 		print(Type)
 		print("=====")
-		#try:
-		if 0==0:
+		try:
+		#if 0==0:
 			if RootType != None:
 				EobjTemp[0] = 0
 				EobjTemp[1] = 0
@@ -2323,6 +3289,10 @@ def MainL():
 					else:
 						if m == "description":
 							ContentObject["visualWidget"].update({m: [QLabel(editorWindow.window), QTextEdit(editorWindow.window)]})
+						elif m == "requirements":
+							ContentObject["visualWidget"].update({m: [QLabel(editorWindow.window), GUIrequirements()]})
+						elif m == "category":
+							ContentObject["visualWidget"].update({m: [QLabel(editorWindow.window), GUIcategory()]})
 						else:
 							ContentObject["visualWidget"].update({m: [QLabel(editorWindow.window), QLineEdit(editorWindow.window)]})
 					ContentObject["visualWidget"][m][0].setText(m)
@@ -2351,6 +3321,10 @@ def MainL():
 						EObjOP(k, [Mods], 0, 120)
 
 						_tempCheckBox = 0
+					elif type(ContentObject["visualWidget"][k][1]) is GUIrequirements:
+						EObjOP(k, [Mods], 0, 60)
+					elif type(ContentObject["visualWidget"][k][1]) is GUIcategory:
+						EObjOP(k, [Mods], 0, 50)
 					else:
 						EObjOP(k, [Mods])
 
@@ -2362,10 +3336,9 @@ def MainL():
 				
 			else:
 				pass
-		#except Exception as x:
-			#CloseContentObject()
-			#SummonMessage(("OpenContentObjectGUI: " + str(x)), "error")
-			#SummonMessage(("Mod: " + str(Mods)), "error")
+		except Exception as x:
+			CloseContentObject()
+			SummonMessage(("OpenContentObjectGUI: " + str(x)), "error")
 			
 
 
@@ -2503,34 +3476,41 @@ def MainL():
 		pass
 
 
-		
-	def SelLCpod(index = None, Type = None):
-		if index != None:
-			TempMod = openFiler(WindowTree.tree.sender().model().filePath(index))
-			#TempMod[0] = json.loads(json.dumps(TempMod[0]))
-			
-			if TempMod != None:
-				if "type" in TempMod[0]:
-					
-					EntryObj(TempMod[0], [EditRoot[1], TempMod[0]["type"]], WindowTree.sender().model().filePath(index), TempMod[1])
-				else:
-					EntryObj(TempMod[0], [EditRoot[1], ""], WindowTree.sender().model().filePath(index), TempMod[1])
-		if Type != None:
-			if Type == "mod":
+	def SelectTreeFind(index = None, Type = None, _newTreeOpen = {"path": ""}):
+		try:
+			if index != None:
+				_path = WindowTree.tree.model().filePath(index)
+				TempMod = openFiler(_path)
 
-				_trep = ""
-				if os.path.exists(RootMod[1] + "/mod.json"):
-					_trep = "json"
-				if os.path.exists(RootMod[1] + "/mod.hjson"):
-					_trep = "hjson"
+				if TempMod != None:
+					if "type" in TempMod[0]:
+						EntryObj(TempMod[0], [EditRoot[1], TempMod[0]["type"]], _path, TempMod[1])
+					else:
+						EntryObj(TempMod[0], [EditRoot[1], ""], _path, TempMod[1])
+			if _newTreeOpen["path"] != "":
+				_path = _newTreeOpen["path"]
+				TempMod = openFiler(_path)
 
-				TempModI = openFiler(RootMod[1] + "/" + Type + "." + _trep)
-				#TempModI[0] = json.loads(json.dumps(TempModI[0]))
-				
-				EntryObj(TempModI[0], ["mod", _trep], RootMod[1] + "/" + Type + "." + _trep, TempModI[1])
+				if TempMod != None:
+					if "type" in TempMod[0]:
+						EntryObj(TempMod[0], [EditRoot[1], TempMod[0]["type"]], _path, TempMod[1])
+					else:
+						EntryObj(TempMod[0], [EditRoot[1], ""], _path, TempMod[1])
+			if Type != None:
+				if Type == "mod":
+					_trep = ""
+					if os.path.exists(RootMod[1] + "/mod.json"):
+						_trep = "json"
+					if os.path.exists(RootMod[1] + "/mod.hjson"):
+						_trep = "hjson"
 
+					TempModI = openFiler(RootMod[1] + "/" + Type + "." + _trep)
+
+					EntryObj(TempModI[0], ["mod", _trep], RootMod[1] + "/" + Type + "." + _trep, TempModI[1])
+		except Exception as x:
+			SummonMessage("SelectTreeFind: "+str(x), _them="error")
 	
-	def SelLC(index = None, event = None, Type = None):
+	def SelectTree(index = None, event = None, Type = None, _newTreeOpen = {"path": ""}):
 			global WS, RootMod, EditRoot, TempMod, window
 		#try:
 			print("=====")
@@ -2538,15 +3518,21 @@ def MainL():
 			print("=====")
 			_yes = False
 			if RootMod[1] != "":
+				if _newTreeOpen["path"] != "":
+					if os.path.isfile(_newTreeOpen["path"]):
+						_yes = True
 				if index != None:
-					if os.path.isfile(WindowTree.tree.sender().model().filePath(index)):
+					if os.path.isfile(WindowTree.tree.model().filePath(index)):
 						_yes = True
 				else:
 					_yes = True
 				if _yes:
 					if TempMod == None or GetContentObjectData() == TempMod:
 
-						SelLCpod(index, Type)
+						if _newTreeOpen["path"] != "":
+							SelectTreeFind(_newTreeOpen = _newTreeOpen)
+						else:
+							SelectTreeFind(index, Type)
 
 					else:
 						msgBox = QMessageBox(window)
@@ -2559,9 +3545,15 @@ def MainL():
 						SaveDialog = msgBox.exec()
 						if SaveDialog == QMessageBox.StandardButton.Yes:
 							ModSave()
-							SelLCpod(index, Type)
+							if _newTreeOpen["path"] != "":
+								SelectTreeFind(_newTreeOpen=_newTreeOpen)
+							else:
+								SelectTreeFind(index, Type)
 						elif SaveDialog == QMessageBox.StandardButton.No:
-							SelLCpod(index, Type)
+							if _newTreeOpen["path"] != "":
+								SelectTreeFind(_newTreeOpen=_newTreeOpen)
+							else:
+								SelectTreeFind(index, Type)
 						elif SaveDialog == QMessageBox.StandardButton.Cancel:
 							pass
 
@@ -2570,7 +3562,7 @@ def MainL():
 			
 
 
-	WindowTree.tree.doubleClicked.connect(SelLC)
+	WindowTree.tree.doubleClicked.connect(SelectTree)
 
 
 
@@ -2579,37 +3571,122 @@ def MainL():
 
 
 
+	def InitializationGUI():
+		global window
+		window.downPanel = QFrame(window)
+		window.downPanel.setStyleSheet(StyleSheetList[0])
+
+		window.downPanel.CreateObj = QPushButton(window.downPanel, text="Создать")
+		window.downPanel.CreateObj.setFont(QFont(families[0], 12))
+		window.downPanel.CreateObj.setStyleSheet(StyleSheetList[0])
+		window.downPanel.CreateObj.setDisabled(readyBuild)
+		window.downPanel.CreateObj.clicked.connect(getCreateFile.upPanel.openWindow)
+
+		window.downPanel.InfoBut = QPushButton(window.downPanel, text="Информация")
+		window.downPanel.InfoBut.setFont(QFont(families[0], 12))
+		window.downPanel.InfoBut.setStyleSheet(StyleSheetList[0])
+		window.downPanel.InfoBut.clicked.connect(infoWindow.upPanel.openWindow)
+
+
+		window.downPanel.settingsButton = QPushButton(window.downPanel)
+		window.downPanel.settingsButton.resize(30, 30)
+		window.downPanel.settingsButton.setText("")
+		window.downPanel.settingsButton.setDisabled(readyBuild)
+		window.downPanel.settingsButton.setStyleSheet(StyleSheetList[0])
+		#window.downPanel.treeWidgetOpener.clicked.connect(lambda: WindowTree.attach(customizationWindow.treeWidgetFrame))
+
+		window.downPanel.treeWidgetOpener = QPushButton(window.downPanel)
+		window.downPanel.treeWidgetOpener.resize(30, 30)
+		window.downPanel.treeWidgetOpener.setText("")
+		window.downPanel.treeWidgetOpener.setStyleSheet(StyleSheetList[0])
+		window.downPanel.treeWidgetOpener.clicked.connect(lambda: WindowTree.attach(customizationWindow.treeWidgetFrame))
+
+		window.downPanel.editorWidgetOpener = QPushButton(window.downPanel)
+		window.downPanel.editorWidgetOpener.resize(30, 30)
+		window.downPanel.editorWidgetOpener.setText("")
+		window.downPanel.editorWidgetOpener.setStyleSheet(StyleSheetList[0])
+		window.downPanel.editorWidgetOpener.clicked.connect(lambda: editorWindow.attach(customizationWindow.editorWidgetFrame))
 
 
 
 
-	# for i in range(0, len(ContentL)):
-	# 	ListContent.append([Frame(frame)])
-	# 	Temp = ImagOPT(toPng(ContentL1[i]))
-	# 	Temp = Image.open(Temp)
-	# 	Temp = Temp.resize((18, 18))
-	# 	Temp = ImageTk.PhotoImage(Temp)
 
-	# 	ListContent[i].append(Label(ListContent[i][0], image = Temp, width = 18, height = 18))
-	# 	ListContent[i][1].image = Temp
-	# 	ListContent[i][1].pack(side=LEFT)
-	# 	ListContent[i].append(Label(ListContent[i][0], text = str(openFiler(ContentL[i])["name"])).pack(side=LEFT))
-	# 	ListContent[i].append(Button(ListContent[i][0], text = "Открыть", command = lambda: openObj(ContentL[i])).pack(side=LEFT))
-	# 	ListContent[i].append(Button(ListContent[i][0], text = "Удалить").pack(side=LEFT))
-	# 	testAdd(ContentL)
+	InitializationGUI()
 
 
-	# 	ListContent[i][0].pack()
+	def timerUpdateGUI():
+		global window
+		try:
+			# tree.setGeometry(0, 75, 300, window.height() - (75 + 30))
+			window.downPanel.setGeometry(0, window.height() - 30, window.width(), 30)
+
+			window.downPanel.CreateObj.setGeometry(0, 0, 75, 30)
+			window.downPanel.InfoBut.setGeometry(75, 0, 125, 30)
+
+
+			window.downPanel.settingsButton.move(300 - 90, 0)
+			window.downPanel.treeWidgetOpener.move(300 - 30, 0)
+			window.downPanel.editorWidgetOpener.move(300 - 60, 0)
 
 
 
-	#window.withdraw()
-	#window.deiconify()
+
+
+			ModeEditButton.setGeometry(int((window.width() - 300) / 2 + 300 - 100), window.height() - 30, 200, 30)
+
+			ModContentFrame.setGeometry(0, 75, 300, window.height() - (75 + 30))
+
+			# GlobalFrameGridFrame.setGeometry(0, 75, window.width(), window.height() - (75 + 30))
+			Frame_Content.resize(window.width() - 300, 75)
+
+
+
+			Name_Content.resize(window.width() - 377, 20)
+			Desc_Content.resize(window.width() - 377, 40)
+			SaveObj.move(window.width() - (int(75 / 2) + 15) - 40, int(75 / 2) - 15)
+			CloseObj.move(window.width() - (int(75 / 2) + 15), int(75 / 2) - 15)
+
+			devVersionLabel.setGeometry(window.width() - 150, window.height() - 30, 150, 30)
+			devVersionLabel.raise_()
+		except Exception as x:
+			SummonMessage("timerUpdateGUI: "+str(x), "error")
+
+	timerUpdateGUI()
+
+	timerUpdateGUI_timer = QTimer()
+	timerUpdateGUI_timer.setInterval(100)
+	timerUpdateGUI_timer.timeout.connect(timerUpdateGUI)
+	timerUpdateGUI_timer.start()
+
+	dDzxc = 0
+	def Dzxc():
+		if dDzxc == 0:
+			dDzxc = 1
+		else:
+			SummonMessage("Не забывай сохраняться!")
+
+	dDzxcw = 0
+	def Dzxcw():
+		if dDzxcw == 0:
+			dDzxcw = 1
+		else:
+			SummonMessage("Пароль: (Версия модификации DL1)")
+	zxc = QTimer()
+	zxc.setInterval(1000*60)
+	zxc.timeout.connect(Dzxc)
+	zxc.start()
+
+	zxcw = QTimer()
+	zxcw.setInterval(1000*1000)
+	zxcw.timeout.connect(Dzxcw)
+	zxcw.start()
 
 
 
 	window.show()
 	window.setBaseSize(800, 700)
+
+	infoWindow.upPanel.openWindow()
 
 	app.exec()
 

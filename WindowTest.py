@@ -11,17 +11,21 @@ from pathlib import Path
 import json
 import hjson
 
-from PyQt6 import QtGui, QtWidgets
-from PyQt6.QtCore import QPoint, QRect, QDir, QAbstractTableModel, QTime, QTimer, QEvent
-from PyQt6 import QtCore
-from PyQt6.QtWidgets import QApplication, QFrame, QLabel, QLayout, QLineEdit, QMainWindow, QPushButton, QScrollBar, \
+from PySide6 import QtGui, QtWidgets
+from PySide6.QtCore import QPoint, QRect, QDir, QAbstractTableModel, QTime, QTimer, QEvent
+from PySide6 import QtCore
+from PySide6.QtWidgets import QApplication, QFrame, QLabel, QLayout, QLineEdit, QMainWindow, QPushButton, QScrollBar, \
 	QStyle, QStyleOptionTitleBar, QTreeView, QFileDialog, QMessageBox, QCheckBox, QScrollArea, QHBoxLayout, QGridLayout, \
-	QComboBox, QTextEdit, QToolBar, QGraphicsTextItem, QGraphicsItem, QSizePolicy, QStyleOptionButton
-from PyQt6.QtGui import QCursor, QFont, QPixmap, QFileSystemModel, QFontDatabase, QPainter, QColor
+	QComboBox, QTextEdit, QToolBar, QGraphicsTextItem, QGraphicsItem, QSizePolicy, QStyleOptionButton, QFileSystemModel
+from PySide6.QtGui import QCursor, QFont, QPixmap, QFontDatabase, QPainter, QColor
 from hjson.scanner import HjsonDecodeError
 
-from DrawWindow import DrawWindow, FrameResizer
+from DrawWindow import DrawWindow, FrameResizer, AttachebleFrame
 from MessagePanel import SummonMessage
+
+qApp.shutdown()
+app = QApplication(sys.argv)
+
 
 windowMoved = None
 
@@ -51,7 +55,7 @@ class MainWindow(QMainWindow):
 
 
 
-app = QApplication(sys.argv)
+
 
 window = MainWindow()
 
@@ -249,7 +253,7 @@ print(_tempTest4)'''
 
 
 
-class AttachebleFrame(QFrame):
+"""class AttachebleFrame(QFrame):
 	def __init__(self, _x = 0, _y = 0, _width = 300, _height = 300, _varLocal = window):
 		super().__init__(window)
 
@@ -476,13 +480,13 @@ class AttachebleFrame(QFrame):
 							#self.visualFrame.show()
 							self.valueFrameAdd = [t, 1]
 							break
-
+"""
 		
 
 		
 
 
-num1 = AttachebleFrame(300, 5, 300, 600)
+num1 = AttachebleFrame(300, 5, 300, 600, _varLocal=window)
 attachebleWidgets.append(num1)
 
 #num2 = AttachebleFrame(500-10, 5, 300, 600)
@@ -934,6 +938,62 @@ tree.doubleClicked.connect(lambda: SummonMessage("Я не понимаю что-
 
 def getSuffixPath(_path):
 	return Path(_path).suffixes[0][1:]
+
+
+
+
+testRequirements = []
+testRequirementsWidgets = []
+class GUIrequirements(QFrame):
+	def __init__(self):
+		super(GUIrequirements, self).__init__(window)
+
+		self.setGeometry(0, 0, 450, 50)
+		self.setStyleSheet("background-color: #000000")
+
+		self.addButton = QPushButton(self)
+		self.addButton.setGeometry(0, 0, 25, 50)
+		self.addButton.setStyleSheet("background-color: #888888")
+		self.addButton.setText("")
+		self.addButton.setFont(QFont(families[0], 12))
+		self.addButton.setStyleSheet(StyleSheetList[0])
+		self.addButton.clicked.connect(self.addRes)
+
+	def addRes(self):
+		testRequirements.append(["copper", 1])
+		testRequirementsWidgets.append([QFrame(), [[QLabel(), QLineEdit()], [QLabel(), QLineEdit()], [QPushButton()]]])
+
+		_tp = testRequirementsWidgets[-1][0]
+		_tp.setParent(self)
+
+		testRequirementsWidgets[-1][1][0][0].setParent(_tp)
+		testRequirementsWidgets[-1][1][0][1].setParent(_tp)
+		testRequirementsWidgets[-1][1][1][0].setParent(_tp)
+		testRequirementsWidgets[-1][1][1][1].setParent(_tp)
+		testRequirementsWidgets[-1][1][2][0].setParent(_tp)
+
+
+
+		_tp.setGeometry(30, 0, 150, 50)
+		_tp.setStyleSheet("background-color: #454545;")
+
+
+
+		testRequirementsWidgets[-1][1][0][0].setGeometry(0, 0, 50, 25)
+		testRequirementsWidgets[-1][1][0][1].setGeometry(50, 0, 75, 25)
+
+		testRequirementsWidgets[-1][1][1][0].setGeometry(0, 25, 50, 25)
+		testRequirementsWidgets[-1][1][1][1].setGeometry(50, 25, 75, 25)
+
+		testRequirementsWidgets[-1][1][2][0].setGeometry(125, 0, 25, 50)
+
+		_tp.show()
+
+
+testGUIrequirements = GUIrequirements()
+testGUIrequirements.move(0, 200)
+#testGUIrequirements.addRes()
+
 
 def openFiler(pathF):
 	try:
