@@ -11,20 +11,24 @@ from pathlib import Path
 import json
 import hjson
 
-from PySide6 import QtGui, QtWidgets
-from PySide6.QtCore import QPoint, QRect, QDir, QAbstractTableModel, QTime, QTimer, QEvent
+from PySide6 import QtGui
 from PySide6 import QtCore
-from PySide6.QtWidgets import QApplication, QFrame, QLabel, QLayout, QLineEdit, QMainWindow, QPushButton, QScrollBar, \
-	QStyle, QStyleOptionTitleBar, QTreeView, QFileDialog, QMessageBox, QCheckBox, QScrollArea, QHBoxLayout, QGridLayout, \
-	QComboBox, QTextEdit, QToolBar, QGraphicsTextItem, QGraphicsItem, QSizePolicy, QStyleOptionButton, QFileSystemModel
-from PySide6.QtGui import QCursor, QFont, QPixmap, QFontDatabase, QPainter, QColor
+from PySide6.QtWidgets import QApplication, QFrame, QLabel, QLineEdit, QMainWindow, QPushButton, QStyle, QTreeView, QFileDialog, QMessageBox, \
+    QGridLayout, \
+	QComboBox, QStyleOptionButton, QFileSystemModel
+from PySide6.QtGui import QFont, QPixmap, QFontDatabase, QPainter, QColor
 from hjson.scanner import HjsonDecodeError
 
-from DrawWindow import DrawWindow, FrameResizer, AttachebleFrame
-from MessagePanel import SummonMessage
+from libs.DrawWindow import DrawWindow, AttachebleFrame
+from libs.MessagePanel import SummonMessage
 
-qApp.shutdown()
-app = QApplication(sys.argv)
+
+if not QApplication.instance():
+	app = QApplication(sys.argv)
+else:
+	app = QApplication.instance()
+
+
 
 
 windowMoved = None
@@ -55,11 +59,18 @@ class MainWindow(QMainWindow):
 
 
 
+		self.bbutton = QPushButton(self)
+		self.bbutton.setGeometry(10, 400, 100, 75)
+		self.bbutton.setStyleSheet("background-image: url(resources/icons/gui.png); margin: 11px, 0")
+
+
+
+
 
 
 window = MainWindow()
 
-id = QFontDatabase.addApplicationFont("font.ttf")
+id = QFontDatabase.addApplicationFont("resources/font.ttf")
 families = QFontDatabase.applicationFontFamilies(id)
 
 SummonMessage("Привет", _window = window)
@@ -550,7 +561,7 @@ def CloseMod():
 	ModChoseButton.show()
 
 
-	Logo = Image.open("noneMod.png")
+	Logo = Image.open("resources/icons/noneMod.png")
 
 
 	ModContentFrame.setAllText("", "", "")
@@ -1099,9 +1110,9 @@ def InitializationMod():
 			if os.path.exists(RootMod[1] + "/icon.png"):
 				Logo = Image.open(RootMod[1] + "/icon.png")
 			else:
-				Logo = Image.open("noneMod.png")
+				Logo = Image.open("resources/icons/noneMod.png")
 		except Exception:
-			Logo = Image.open("noneMod.png")
+			Logo = Image.open("resources/icons/noneMod.png")
 
 		_ttt = ["name", "version", "author"]
 		for p in range(len(_ttt)):
@@ -1133,3 +1144,7 @@ window.show()
 window.setBaseSize(800, 700)
 
 app.exec()
+if not app:
+	sys.exit()
+else:
+	app.exec()
